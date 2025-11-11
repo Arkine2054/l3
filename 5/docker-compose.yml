@@ -1,0 +1,43 @@
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: events_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: events
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5438:5432"
+
+  migrate:
+    image: migrate/migrate
+    depends_on:
+      - db
+    command: >
+      -path=migrations
+      -database=postgres://postgres:postgres@db:5432/events?sslmode=disable
+      up
+    volumes:
+      - ./migrations:/migrations:ro
+
+  app:
+    build: .
+    container_name: events_app
+    restart: always
+    depends_on:
+      - db
+      - migrate
+    environment:
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/events?sslmode=disable
+      - BOOKING_EXPIRATION_MINUTES=2
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./web:/app/web
+
+volumes:
+  db_data:

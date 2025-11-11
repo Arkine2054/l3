@@ -1,0 +1,31 @@
+
+services:
+  db:
+    image: postgres:15
+    container_name: comments-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres1
+      POSTGRES_PASSWORD: postgres1
+      POSTGRES_DB: comments
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+
+  app:
+    build: .
+    container_name: comments-service
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres1
+      DB_PASSWORD: postgres1
+      DB_NAME: comments
+    depends_on:
+      - db
+    ports:
+      - "8086:8080"  # 8086 на хосте, 8080 в контейнере
+
+volumes:
+  db_data:

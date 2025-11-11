@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Комментарии</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            margin: 20px;
+            background-color: #f5f6fa;
+        }
+        h1 {
+            color: #333;
+        }
+        .comment {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin: 10px 0;
+        }
+        .reply {
+            margin-left: 20px;
+            border-left: 2px solid #ccc;
+            padding-left: 10px;
+        }
+        .author {
+            font-weight: bold;
+            color: #0055aa;
+        }
+        .controls {
+            margin-top: 6px;
+        }
+        button {
+            margin-right: 5px;
+            padding: 4px 8px;
+            border: none;
+            border-radius: 5px;
+            background: #0078d7;
+            color: white;
+            cursor: pointer;
+        }
+        button.delete {
+            background: #d9534f;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        input, textarea {
+            width: 100%;
+            margin-top: 5px;
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        #searchBox {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+<h1>Комментарии</h1>
+
+<div id="searchBox">
+    <input type="text" id="search" placeholder="Поиск по комментариям...">
+    <button onclick="searchComments()">Найти</button>
+    <button onclick="resetSearch()">Сбросить</button>
+</div>
+
+<div id="comments"></div>
+
+<h3>Добавить комментарий</h3>
+<input id="author" placeholder="Ваше имя">
+<textarea id="content" placeholder="Ваш комментарий..."></textarea>
+<button onclick="createComment()">Отправить</button>
+
+<script>
+    async function loadComments(search = "") {
+        let url = '/api/comments';
+        if (search) url += `?search=${encodeURIComponent(search)}`;
+        const res = await fetch(url);
+        if (!res.ok) {
+            console.error("Ошибка при загрузке:", res.statusText);
+            return;
+        }
+        const data = await res.json();
+        const container = document.getElementById('comments');
+        container.innerHTML = renderComments(data);
+    }
+
+    function renderComments(comments, level = 0) {
+        return comments.map(c => `
+        <div class="comment reply" style="margin-left:${level * 20}px">
+          <div class="author">${c.author}</div>
+          <div class="content">${c.content}</div>
+          <div class="controls">
+            <button onclick="replyTo(${c.id})">Ответить</button>
+            <button class="delete" onclick="deleteComment(${c.id})">Удалить</button>
+          </div>
+          ${c.children && c.children.length ? renderComments(c.children, level + 1) : ''}
+        </div>
+      `).join('');
+    }
+
+    function replyTo(parentId) {
+        const author = prompt("Ваше имя:");
+        const content = prompt("Ваш ответ:");
+        if (!author || !content) return;
+        fetch('/api/comments', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ parent_id: parentId, author, content })
+        }).then(() => loadComments());
+    }
+
+    function deleteComment(id) {
+        if (!confirm("Удалить комментарий и все ответы?")) return;
+        fetch('/api/comments/' + id, { method: 'DELETE' }).then(() => loadComments());
+    }
+
+    function createComment() {
+        const author = document.getElementById('author').value.trim();
+        const content = document.getElementById('content').value.trim();
+        if (!author || !content) return alert("Заполните имя и комментарий!");
+        fetch('/api/comments', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ author, content })
+        }).then(() => {
+            document.getElementById('author').value = "";
+            document.getElementById('content').value = "";
+            loadComments();
+        });
+    }
+
+    function searchComments() {
+        const term = document.getElementById('search').value.trim();
+        if (term) loadComments(term);
+    }
+
+    function resetSearch() {
+        document.getElementById('search').value = "";
+        loadComments();
+    }
+
+    loadComments();
+</script>
+
+</body>
+</html>

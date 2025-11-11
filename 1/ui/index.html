@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>DelayedNotifier UI</title>
+    <style>
+        body { font-family: sans-serif; margin: 2em; }
+        input, select, button { margin: 0.3em; }
+        ul { list-style: none; padding: 0; }
+        li { border-bottom: 1px solid #ccc; padding: 6px 0; display: flex; justify-content: space-between; align-items: center; }
+        .info { flex-grow: 1; }
+        .cancel-btn, .resend-btn { background-color: #e74c3c; color: white; border: none; padding: 4px 8px; cursor: pointer; border-radius: 4px; margin-left: 0.3em; }
+        .cancel-btn:hover { background-color: #c0392b; }
+        .resend-btn { background-color: #3498db; }
+        .resend-btn:hover { background-color: #2980b9; }
+    </style>
+</head>
+<body>
+<h1>Создать уведомление</h1>
+<form id="notifyForm">
+    Получатель (Recipient): <input type="text" name="recipient" value="user@example.com"><br>
+    Канал (Channel):
+    <select name="channel" id="channelSelect"></select><br>
+    Сообщение (Message): <input type="text" name="message" value="Напоминание о встрече через час"><br>
+    Время отправки (UTC): <input type="datetime-local" name="send_at"><br>
+    <button type="submit">Отправить</button>
+</form>
+
+<h2>Последние уведомления</h2>
+<button id="refreshBtn">🔄 Обновить</button>
+<ul id="notifications"></ul>
+
+<script>
+    const apiBase = 'http://localhost:8083';
+
+    // Загрузка каналов динамически
+    async function loadChannels() {
+        const res = await fetch(`${apiBase}/channels`);
+        const channels = await res.json();
+        const select = document.getElementById('channelSelect');
+        select.innerHTML = '';
+        channels.forEach(ch => {
+            const opt = document.createElement('option');
+            opt.value = ch;
+            opt.textContent = ch.charAt(0).toUpperCase() + ch.slice(1);
+            select.appendChild(opt);
+        });
+    }
+
+    // Загрузка уведомлений
+    async function fetchNotifications() {
+        try {
+            const res = await fetch(`${apiBase}/notify`);
+            const list = await res.json();
+            const ul = document.getElementById('notifications');
+            ul.innerHTML = '';
+
+            if (!list.length) {
+                ul.innerHTML = '<li><em>Нет уведомлений</em></li>';
+                return;
+            }
+
+            list.forEach(n => {
+                const li = document.createElement('li');
+
+                const info = document.createElement('span');
+                info.className = 'info';
+                info.textContent = `${n.id} | ${n.recipient} | ${n.channel} | ${n.status} | ${new Date(n.send_at).toLocaleString()}`;
+                li.appendChild(info);
+
+                if (n.status === 'scheduled') {
+                    const cancelBtn = document.createElement('button');
+                    cancelBtn.textContent = '🗑 Отменить';
+                    cancelBtn.className = 'cancel-btn';
+                    cancelBtn.onclick = () => cancelNotification(n.id);
+                    li.appendChild(cancelBtn);
+
+                    const resendBtn = document.createElement('button');
+                    resendBtn.textContent = '⏰ Повторно отправить';
+                    resendBtn.className = 'resend-btn';
+                    resendBtn.onclick = () => {
+                        const newTime = prompt("Введите новое время отправки (UTC, формат: YYYY-MM-DDTHH:MM:SSZ)", n.send_at);
+                        if (!newTime) return;
+                        fetch(`${apiBase}/notify/${n.id}/reschedule`, {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({send_at: newTime})
+                        }).then(r => r.ok ? fetchNotifications() : alert("Ошибка при повторной отправке"));
+                    };
+                    li.appendChild(resendBtn);
+                }
+
+                ul.appendChild(li);
+            });
+        } catch (err) {
+            console.error('Ошибка при загрузке уведомлений:', err);
+        }
+    }
+
+    async function cancelNotification(id) {
+        if (!confirm(`Отменить уведомление #${id}?`)) return;
+
+        const res = await fetch(`${apiBase}/notify/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            alert(`Уведомление #${id} отменено`);
+            fetchNotifications();
+        } else {
+            alert(`Ошибка при отмене: ${res.status}`);
+        }
+    }
+
+    // Обработчик формы создания уведомления
+    document.getElementById('notifyForm').addEventListener('submit', async e => {
+        e.preventDefault();
+        const form = e.target;
+        const sendAtInput = new Date(form.send_at.value);
+        if (!sendAtInput.getTime()) {
+            alert("Выберите корректное время отправки!");
+            return;
+        }
+
+        const data = {
+            recipient: form.recipient.value.trim(),
+            channel: form.channel.value,
+            message: form.message.value.trim(),
+            send_at: sendAtInput.toISOString()
+        };
+
+        if (!data.recipient || !data.message) {
+            alert("Заполните все обязательные поля!");
+            return;
+        }
+
+        await fetch(`${apiBase}/notify`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+
+        form.reset();
+        await fetchNotifications();
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', fetchNotifications);
+
+    // Инициализация
+    loadChannels();
+    fetchNotifications();
+</script>
+</body>
+</html>

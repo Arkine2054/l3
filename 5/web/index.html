@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>События</title>
+  <link rel="stylesheet" href="https://cdn.simplecss.org/simple.css" />
+  <script defer src="js/api.js"></script>
+  <script defer>
+    async function loadEvents() {
+      const events = await api.getEvents();
+      const list = document.getElementById("events");
+      list.innerHTML = "";
+
+      if (!events.length) {
+        list.innerHTML = "<p>Пока нет событий</p>";
+        return;
+      }
+
+      for (const e of events) {
+        const li = document.createElement("li");
+        li.innerHTML = `
+          <strong>${e.title}</strong> — ${new Date(e.date).toLocaleString()}
+          <br>Мест: ${e.total_seats}, Свободно: ${e.available}
+          <br><a href="event.html?id=${e.id}">Подробнее</a>
+        `;
+        list.appendChild(li);
+      }
+    }
+
+    async function createEvent(e) {
+      e.preventDefault();
+      const title = document.getElementById("title").value;
+      const date = document.getElementById("date").value;
+      const seats = parseInt(document.getElementById("seats").value);
+
+      const result = await api.createEvent(title, date, seats);
+      if (result) {
+        alert("Событие создано!");
+        await loadEvents();
+        e.target.reset();
+      } else {
+        alert("Ошибка при создании события");
+      }
+    }
+
+    window.onload = () => {
+      loadEvents();
+      document.getElementById("eventForm").addEventListener("submit", createEvent);
+    };
+  </script>
+</head>
+<body>
+<h1>События</h1>
+
+<h2>Создать новое событие</h2>
+<form id="eventForm">
+  <label>Название: <input id="title" required /></label><br>
+  <label>Дата (ISO): <input id="date" type="datetime-local" required /></label><br>
+  <label>Мест: <input id="seats" type="number" min="1" required /></label><br>
+  <button type="submit">Создать</button>
+</form>
+
+<h2>Список событий</h2>
+<ul id="events"></ul>
+</body>
+</html>

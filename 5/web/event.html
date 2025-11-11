@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Событие</title>
+  <link rel="stylesheet" href="https://cdn.simplecss.org/simple.css" />
+  <script defer src="js/api.js"></script>
+  <script defer>
+    let eventId;
+
+    async function loadEvent() {
+      const params = new URLSearchParams(location.search);
+      eventId = parseInt(params.get("id"));
+      const e = await api.getEvent(eventId);
+      if (!e) {
+        document.body.innerHTML = "<p>Событие не найдено</p>";
+        return;
+      }
+      document.getElementById("title").innerText = e.title;
+      document.getElementById("date").innerText = new Date(e.date).toLocaleString();
+      document.getElementById("seats").innerText = `${e.total_seats}`;
+    }
+
+    async function bookSeat(e) {
+      e.preventDefault();
+      const name = document.getElementById("user").value;
+      const booking = await api.bookSeat(eventId, name);
+      if (booking) {
+        alert(`Бронь создана! ID: ${booking.id}`);
+      } else {
+        alert("Ошибка: мест нет или бронь не создана");
+      }
+    }
+
+    async function confirmBooking(e) {
+      e.preventDefault();
+      const id = parseInt(document.getElementById("booking").value);
+      const ok = await api.confirmBooking(eventId, id);
+      if (ok) alert("Бронь подтверждена!");
+      else alert("Ошибка при подтверждении");
+    }
+
+    window.onload = () => {
+      loadEvent();
+      document.getElementById("bookForm").addEventListener("submit", bookSeat);
+      document.getElementById("confirmForm").addEventListener("submit", confirmBooking);
+    };
+  </script>
+</head>
+<body>
+<a href="index.html">← Назад к событиям</a>
+<h1 id="title"></h1>
+<p>Дата: <span id="date"></span></p>
+<p>Всего мест: <span id="seats"></span></p>
+
+<h3>Забронировать место</h3>
+<form id="bookForm">
+  <label>Имя: <input id="user" required /></label>
+  <button type="submit">Забронировать</button>
+</form>
+
+<h3>Подтвердить бронь</h3>
+<form id="confirmForm">
+  <label>ID брони: <input id="booking" type="number" required /></label>
+  <button type="submit">Подтвердить</button>
+</form>
+</body>
+</html>

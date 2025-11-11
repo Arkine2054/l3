@@ -1,0 +1,121 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Mini URL Shortener</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 900px; margin: 40px auto; }
+        input[type=text]{width:100%; padding:8px; margin:6px 0;}
+        button{padding:8px 12px; margin-top:6px;}
+        .box{border:1px solid #ddd; padding:12px; margin-top:12px;}
+        table {border-collapse: collapse; width: 100%; margin-top: 12px;}
+        th, td {border: 1px solid #ddd; padding: 8px; text-align: left;}
+        th {background-color: #f2f2f2;}
+    </style>
+</head>
+<body>
+<h1>URL Shortener</h1>
+
+<div class="box">
+    <label>Original URL:</label>
+    <input id="target" type="text" placeholder="https://example.com/very/long" />
+    <label>Custom alias (optional):</label>
+    <input id="alias" type="text" placeholder="my-link" />
+    <button id="createBtn">Create</button>
+    <div id="result"></div>
+</div>
+
+<div class="box">
+    <h3>Analytics</h3>
+    <input id="a_alias" type="text" placeholder="alias" />
+    <button id="analyticsBtn">Get analytics</button>
+    <div id="analytics"></div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('createBtn').addEventListener('click', create);
+        document.getElementById('analyticsBtn').addEventListener('click', getAnalytics);
+    });
+
+    async function create() {
+        const target = document.getElementById('target').value.trim();
+        const alias = document.getElementById('alias').value.trim();
+        if(!target) { alert('Enter URL'); return; }
+
+        try {
+            const res = await fetch('/shorten', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({target, alias})
+            });
+
+            const out = document.getElementById('result');
+            if(!res.ok) {
+                out.innerText = 'Error: ' + await res.text();
+                return;
+            }
+
+            const data = await res.json();
+
+            // Выводим короткую ссылку с кнопкой Copy
+            out.innerHTML = `<b>Short URL:</b>
+                         <a href="${data.url}" target="_blank" id="shortlink">${data.url}</a>
+                         <button onclick="copyLink()">Copy</button>`;
+
+            // Подставляем alias в поле Analytics
+            const aInput = document.getElementById('a_alias');
+            if(aInput) aInput.value = data.alias;
+
+        } catch(e) {
+            document.getElementById('result').innerText = 'Error: ' + e.message;
+        }
+    }
+
+    function copyLink() {
+        const link = document.getElementById('shortlink').href;
+        navigator.clipboard.writeText(link).then(() => {
+            alert('Copied to clipboard: ' + link);
+        }).catch(err => {
+            alert('Failed to copy: ' + err);
+        });
+    }
+
+    async function getAnalytics() {
+        const alias = document.getElementById('a_alias').value.trim();
+        if(!alias){ alert('Enter alias!'); return; }
+
+        try {
+            const res = await fetch('/analytics/' + encodeURIComponent(alias));
+            const container = document.getElementById('analytics');
+
+            if(!res.ok) {
+                container.innerText = 'Error: ' + await res.text();
+                return;
+            }
+
+            const data = await res.json();
+            if(!data.length){ container.innerText = 'No clicks yet.'; return; }
+
+            // Строим таблицу
+            let html = '<table><tr><th>ID</th><th>User Agent</th><th>IP</th><th>Referer</th><th>Time</th></tr>';
+            data.forEach(item => {
+                html += `<tr>
+                        <td>${item.id}</td>
+                        <td>${item.user_agent}</td>
+                        <td>${item.ip}</td>
+                        <td>${item.referer || '-'}</td>
+                        <td>${new Date(item.created_at).toLocaleString()}</td>
+                     </tr>`;
+            });
+            html += '</table>';
+            container.innerHTML = html;
+
+        } catch(e) {
+            document.getElementById('analytics').innerText = 'Error: ' + e.message;
+        }
+    }
+</script>
+
+</body>
+</html>

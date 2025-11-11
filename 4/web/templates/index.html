@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <title>Image Processor</title>
+    <style>
+        body{font-family: Arial; padding:20px}
+        .card{border:1px solid #ddd;padding:12px;margin-bottom:10px;border-radius:6px;background:#fff}
+        .thumb{width:160px;height:120px;object-fit:cover;margin-right:10px}
+        .flex{display:flex;align-items:center}
+        button{padding:6px 8px;margin-left:8px}
+    </style>
+</head>
+<body>
+<h1>Image processing demo</h1>
+
+<form id="uploadForm">
+    <input type="file" name="file" id="fileInput" accept="image/*">
+    <button type="submit">Upload</button>
+</form>
+
+<h2>Uploaded</h2>
+<div id="list"></div>
+
+<script>
+    function getFilename(path) {
+        return path.split('/').pop();
+    }
+
+    async function loadList(){
+        const res = await fetch('/images');
+        const items = await res.json();
+        const el = document.getElementById('list');
+        el.innerHTML = items.map(i => {
+            const thumbUrl = i.thumb_path
+                ? '/data/thumbs/' + getFilename(i.thumb_path)
+                : '/data/original/' + getFilename(i.stored_path);
+            const processedUrl = i.processed_path
+                ? '/data/processed/' + getFilename(i.processed_path)
+                : '/data/original/' + getFilename(i.stored_path);
+
+            return `
+        <div class="card">
+          <div class="flex">
+            <img class="thumb" src="${thumbUrl}" onerror="this.src='/static/placeholder.png'">
+            <div>
+              <div><b>${i.orig_filename}</b></div>
+              <div>Status: ${i.status}</div>
+              <div>
+                <a href="${processedUrl}" target="_blank">Open processed</a>
+                <button onclick="deleteImage(${i.id})">Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        `;
+        }).join('');
+    }
+
+    document.getElementById('uploadForm').addEventListener('submit', async (e)=>{
+        e.preventDefault();
+        const f = document.getElementById('fileInput').files[0];
+        if(!f) return alert('select file');
+        const fd = new FormData();
+        fd.append('file', f);
+        const res = await fetch('/upload', { method: 'POST', body: fd});
+        if(!res.ok) { alert('upload failed'); return }
+        await loadList();
+    });
+
+    async function deleteImage(id){
+        if(!confirm('delete?')) return;
+        await fetch('/image/' + id, { method: 'DELETE' });
+        await loadList();
+    }
+
+    // auto refresh
+    setInterval(loadList, 3000);
+    loadList();
+</script>
+</body>
+</html>
