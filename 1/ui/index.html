@@ -33,7 +33,6 @@
 <script>
     const apiBase = 'http://localhost:8083';
 
-    // Загрузка каналов динамически
     async function loadChannels() {
         const res = await fetch(`${apiBase}/channels`);
         const channels = await res.json();
@@ -47,7 +46,6 @@
         });
     }
 
-    // Загрузка уведомлений
     async function fetchNotifications() {
         try {
             const res = await fetch(`${apiBase}/notify`);
@@ -109,7 +107,6 @@
         }
     }
 
-    // Обработчик формы создания уведомления
     document.getElementById('notifyForm').addEventListener('submit', async e => {
         e.preventDefault();
         const form = e.target;
@@ -143,7 +140,6 @@
 
     document.getElementById('refreshBtn').addEventListener('click', fetchNotifications);
 
-    // Инициализация
     loadChannels();
     fetchNotifications();
 </script>
