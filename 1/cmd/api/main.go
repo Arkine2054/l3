@@ -158,7 +158,10 @@ func main() {
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]int64{"id": id})
+		err = json.NewEncoder(w).Encode(map[string]int64{"id": id})
+		if err != nil {
+			log.Printf("failed to encode notify response: %v", err)
+		}
 	})
 
 	r.Get("/notify", func(w http.ResponseWriter, req *http.Request) {
@@ -271,13 +274,19 @@ func main() {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(not)
+		err = json.NewEncoder(w).Encode(not)
+		if err != nil {
+			log.Printf("failed to encode reschedule response: %v", err)
+		}
 	})
 
 	r.Get("/channels", func(w http.ResponseWriter, r *http.Request) {
 		channels := []string{"email", "telegram", "simulated"}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(channels)
+		err = json.NewEncoder(w).Encode(channels)
+		if err != nil {
+			log.Printf("failed to encode channels: %v", err)
+		}
 	})
 
 	r.Delete("/notify/{id}", func(w http.ResponseWriter, req *http.Request) {
