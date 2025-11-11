@@ -125,10 +125,16 @@ func (r *Repo) CancelNotification(ctx context.Context, id int64) error {
 		return fmt.Errorf("cancel notification: %w", err)
 	}
 
-	affected, _ := res.RowsAffected()
+	affected, err := res.RowsAffected()
+	if err != nil {
+		log.Printf("CancelNotification RowsAffected failed for id=%d: %v", id, err)
+		return fmt.Errorf("rows affected: %w", err)
+	}
+
 	if affected == 0 {
 		log.Printf("CancelNotification: no rows affected for id=%d", id)
 		return fmt.Errorf("notification not found")
 	}
+
 	return nil
 }
