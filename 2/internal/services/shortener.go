@@ -32,7 +32,6 @@ func (s *ShortenerService) CreateShortURL(target, customAlias string, r *http.Re
 		alias = utils.RandomAlias(6)
 	}
 
-	// check if exists
 	existing, _ := s.repo.FindByAlias(alias)
 	if existing != nil {
 		return nil, fmt.Errorf("alias '%s' already exists", alias)

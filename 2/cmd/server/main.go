@@ -18,20 +18,16 @@ func main() {
 		log.Fatalf("DB init error: %v", err)
 	}
 
-	// Repositories
 	shortRepo := repo.NewShortURLRepo(db.SQL)
 	clickRepo := repo.NewClickRepo(db.SQL)
 
-	// Services
 	shortService := services.NewShortenerService(shortRepo)
 	analyticsService := services.NewAnalyticsService(clickRepo)
 
-	// Handlers
 	shortenHandler := handlers.NewShortenHandler(shortService)
 	redirectHandler := handlers.NewRedirectHandler(shortRepo, clickRepo)
 	analyticsHandler := handlers.NewAnalyticsHandler(analyticsService)
 
-	// Router
 	r := router.New(shortenHandler, redirectHandler, analyticsHandler)
 
 	port := os.Getenv("PORT")

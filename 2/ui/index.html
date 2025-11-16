@@ -58,12 +58,10 @@
 
             const data = await res.json();
 
-            // Выводим короткую ссылку с кнопкой Copy
             out.innerHTML = `<b>Short URL:</b>
                          <a href="${data.url}" target="_blank" id="shortlink">${data.url}</a>
                          <button onclick="copyLink()">Copy</button>`;
 
-            // Подставляем alias в поле Analytics
             const aInput = document.getElementById('a_alias');
             if(aInput) aInput.value = data.alias;
 
@@ -97,7 +95,6 @@
             const data = await res.json();
             if(!data.length){ container.innerText = 'No clicks yet.'; return; }
 
-            // Строим таблицу
             let html = '<table><tr><th>ID</th><th>User Agent</th><th>IP</th><th>Referer</th><th>Time</th></tr>';
             data.forEach(item => {
                 html += `<tr>
