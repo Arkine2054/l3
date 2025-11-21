@@ -81,5 +81,4 @@ data.forEach(c => renderComment(c, document.getElementById('comments-container')
 });
 }
 
-// загружаем корневые комментарии при старте
 loadComments();

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -14,7 +15,6 @@ type CommentHandler struct {
 	Repo *repository.CommentRepo
 }
 
-// Создать комментарий
 func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 	var c models.Comment
 	if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
@@ -26,10 +26,12 @@ func (h *CommentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(c)
+	err := json.NewEncoder(w).Encode(c)
+	if err != nil {
+		log.Printf("error encoding comment: %v", err)
+	}
 }
 
-// Удалить комментарий
 func (h *CommentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	idStr := mux.Vars(r)["id"]
 	id, err := strconv.ParseInt(idStr, 10, 64)
@@ -44,7 +46,6 @@ func (h *CommentHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// Получить список комментариев или выполнить поиск
 func (h *CommentHandler) List(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 	search := query.Get("search")
@@ -80,5 +81,8 @@ func (h *CommentHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(comments)
+	err = json.NewEncoder(w).Encode(comments)
+	if err != nil {
+		log.Printf("error encoding list comments: %v", err)
+	}
 }

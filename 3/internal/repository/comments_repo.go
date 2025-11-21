@@ -10,7 +10,6 @@ type CommentRepo struct {
 	DB *sql.DB
 }
 
-// Создание комментария
 func (r *CommentRepo) Create(c *models.Comment) error {
 	query := `
 		INSERT INTO comments (parent_id, author, content, created_at)
@@ -21,7 +20,6 @@ func (r *CommentRepo) Create(c *models.Comment) error {
 		Scan(&c.ID, &c.CreatedAt)
 }
 
-// Удаление комментария и всех дочерних
 func (r *CommentRepo) Delete(id int64) error {
 	_, err := r.DB.Exec(`
 		WITH RECURSIVE sub AS (
@@ -35,7 +33,6 @@ func (r *CommentRepo) Delete(id int64) error {
 	return err
 }
 
-// Получение всех комментариев с вложенностью
 func (r *CommentRepo) List() ([]*models.Comment, error) {
 	rows, err := r.DB.Query(`
 		SELECT id, parent_id, author, content, created_at
@@ -70,7 +67,6 @@ func (r *CommentRepo) List() ([]*models.Comment, error) {
 		lookup[c.ID] = &c
 	}
 
-	// Собираем дерево
 	var roots []*models.Comment
 	for _, c := range all {
 		if c.ParentID != nil {
@@ -85,7 +81,6 @@ func (r *CommentRepo) List() ([]*models.Comment, error) {
 	return roots, nil
 }
 
-// Поиск по содержимому
 func (r *CommentRepo) Search(term string, limit, offset int) ([]*models.Comment, error) {
 	rows, err := r.DB.Query(`
 		SELECT id, parent_id, author, content, created_at

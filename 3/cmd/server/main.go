@@ -26,16 +26,13 @@ func main() {
 
 	r := mux.NewRouter()
 
-	// ✅ API endpoints
 	api := r.PathPrefix("/api").Subrouter()
 	api.HandleFunc("/comments", handler.Create).Methods("POST")
 	api.HandleFunc("/comments", handler.List).Methods("GET")
 	api.HandleFunc("/comments/{id:[0-9]+}", handler.Delete).Methods("DELETE")
 
-	// ✅ Static files (если будут)
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
 
-	// ✅ Главная страница
 	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "web/templates/index.html")
 	})
