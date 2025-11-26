@@ -1,4 +1,3 @@
-```markdown
 # DelayedNotifier — Отложенные уведомления через очереди
 
 DelayedNotifier — это сервис на Go для создания и отправки отложенных уведомлений через RabbitMQ и Postgres.  
@@ -47,22 +46,6 @@ DelayedNotifier — это сервис на Go для создания и от�
 3. **PostgreSQL** хранит уведомления и их статусы
 
 4. **RabbitMQ** обеспечивает асинхронную очередь уведомлений  
-
----
-
-## Запуск через Docker
-
-### Собрать и запустить сервис
-
-```bash
-docker-compose up --build
-````
-
-* API доступен на `http://localhost:8082`
-* RabbitMQ Management UI: `http://localhost:15673` (логин/пароль: guest/guest)
-* Postgres на порту `5433`
-
----
 
 ## HTTP API
 
@@ -154,27 +137,6 @@ curl http://localhost:8082/notify/1
 ```bash
 curl -X DELETE http://localhost:8082/notify/1
 ```
-
-### Через Postman
-
-1. Создать коллекцию `DelayedNotifier`
-2. Добавить запросы:
-
-    * `POST /notify` с JSON телом
-    * `GET /notify/{id}`
-    * `DELETE /notify/{id}`
-
----
-
-## Настройки через окружение
-
-| Переменная     | Описание                       | Пример                                                        |
-| -------------- | ------------------------------ | ------------------------------------------------------------- |
-| `DATABASE_URL` | URL для подключения к Postgres | `postgres://user:pass@postgres:5432/notifier?sslmode=disable` |
-| `RABBITMQ_URL` | URL для подключения к RabbitMQ | `amqp://guest:guest@rabbitmq:5672/`                           |
-
----
-
 ## Важные моменты
 
 * Worker и API запускаются отдельно, Worker обрабатывает очередь и retry.
