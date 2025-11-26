@@ -11,14 +11,13 @@ const (
 
 type Sale struct {
 	ID        int64     `json:"id"`
-	Kind      Kind      `json:"kind"`   // income / expense
-	Amount    float64   `json:"amount"` // абсолютная сумма
+	Kind      Kind      `json:"kind"`
+	Amount    float64   `json:"amount"`
 	Category  string    `json:"category"`
 	Note      string    `json:"note,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// аналитическая сводка
 type Analytics struct {
 	From         *time.Time `json:"from,omitempty"`
 	To           *time.Time `json:"to,omitempty"`

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -41,7 +42,6 @@ func main() {
 		}
 	})
 	mux.HandleFunc("/items/", func(w http.ResponseWriter, r *http.Request) {
-		// path: /items/{id}
 		idStr := r.URL.Path[len("/items/"):]
 		id, err := strconv.ParseInt(idStr, 10, 64)
 		if err != nil {
@@ -71,8 +71,6 @@ func main() {
 	log.Printf("listening %s", addr)
 	log.Fatal(http.ListenAndServe(addr, mux))
 }
-
-/* Handlers (simplified) */
 
 func parseTimePtr(q string) *time.Time {
 	if q == "" {
@@ -109,7 +107,10 @@ func handleCreateSale(repo *repository.Repo, w http.ResponseWriter, r *http.Requ
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(s)
+	err := json.NewEncoder(w).Encode(s)
+	if err != nil {
+		log.Println("Write create sale error:", err)
+	}
 }
 
 func handleListSales(repo *repository.Repo, w http.ResponseWriter, r *http.Request) {
@@ -157,7 +158,10 @@ func handleListSales(repo *repository.Repo, w http.ResponseWriter, r *http.Reque
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(arr)
+	err = json.NewEncoder(w).Encode(arr)
+	if err != nil {
+		log.Println("Write list sales error:", err)
+	}
 }
 
 func handleGetSale(repo *repository.Repo, w http.ResponseWriter, r *http.Request, id int64) {
@@ -170,7 +174,10 @@ func handleGetSale(repo *repository.Repo, w http.ResponseWriter, r *http.Request
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	json.NewEncoder(w).Encode(s)
+	err = json.NewEncoder(w).Encode(s)
+	if err != nil {
+		log.Println("Write get sale error:", err)
+	}
 }
 
 func handleUpdateSale(repo *repository.Repo, w http.ResponseWriter, r *http.Request, id int64) {
@@ -181,7 +188,7 @@ func handleUpdateSale(repo *repository.Repo, w http.ResponseWriter, r *http.Requ
 	}
 	s.ID = id
 	if err := repo.UpdateSale(r.Context(), &s); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
@@ -189,12 +196,15 @@ func handleUpdateSale(repo *repository.Repo, w http.ResponseWriter, r *http.Requ
 		log.Println("update:", err)
 		return
 	}
-	json.NewEncoder(w).Encode(s)
+	err := json.NewEncoder(w).Encode(s)
+	if err != nil {
+		log.Println("Write update sale error:", err)
+	}
 }
 
 func handleDeleteSale(repo *repository.Repo, w http.ResponseWriter, r *http.Request, id int64) {
 	if err := repo.DeleteSale(r.Context(), id); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			http.Error(w, "not found", http.StatusNotFound)
 			return
 		}
@@ -224,11 +234,13 @@ func handleAnalytics(repo *repository.Repo, w http.ResponseWriter, r *http.Reque
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(a)
+	err = json.NewEncoder(w).Encode(a)
+	if err != nil {
+		log.Println("Write analytics error:", err)
+	}
 }
 
 func handleExportCSV(repo *repository.Repo, w http.ResponseWriter, r *http.Request) {
-	// re-use ListSales filter but return CSV
 	q := r.URL.Query()
 	f := repository.ListFilter{Limit: 10000}
 	if cat := q.Get("category"); cat != "" {
@@ -258,9 +270,12 @@ func handleExportCSV(repo *repository.Repo, w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Disposition", "attachment; filename=\"sales.csv\"")
 	cw := csv.NewWriter(w)
 	defer cw.Flush()
-	cw.Write([]string{"id", "kind", "amount", "category", "note", "created_at"})
+	err = cw.Write([]string{"id", "kind", "amount", "category", "note", "created_at"})
+	if err != nil {
+		log.Println("Write export csv error:", err)
+	}
 	for _, s := range arr {
-		cw.Write([]string{
+		err := cw.Write([]string{
 			strconv.FormatInt(s.ID, 10),
 			string(s.Kind),
 			fmt.Sprintf("%.2f", s.Amount),
@@ -268,5 +283,9 @@ func handleExportCSV(repo *repository.Repo, w http.ResponseWriter, r *http.Reque
 			s.Note,
 			s.CreatedAt.Format(time.RFC3339),
 		})
+
+		if err != nil {
+			log.Println("Write export csv error:", err)
+		}
 	}
 }

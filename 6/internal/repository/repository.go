@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,9 +18,6 @@ func NewRepo(db *sql.DB) *Repo {
 	return &Repo{DB: db}
 }
 
-/* CRUD */
-
-// Create sale
 func (r *Repo) CreateSale(ctx context.Context, s *models.Sale) error {
 	q := `INSERT INTO sales (kind, amount, category, note, created_at)
           VALUES ($1, $2, $3, $4, $5)
@@ -31,7 +29,6 @@ func (r *Repo) CreateSale(ctx context.Context, s *models.Sale) error {
 	return nil
 }
 
-// Get all (with optional filters)
 type ListFilter struct {
 	From     *time.Time
 	To       *time.Time
@@ -39,7 +36,7 @@ type ListFilter struct {
 	Kind     *models.Kind
 	Limit    int
 	Offset   int
-	SortBy   string // created_at, amount, etc. (careful with injection, whitelist below)
+	SortBy   string
 	Desc     bool
 }
 
@@ -50,7 +47,6 @@ var allowedSort = map[string]bool{
 }
 
 func (r *Repo) ListSales(ctx context.Context, f ListFilter) ([]models.Sale, error) {
-	// build query safely: only allow whitelisted sort fields
 	sort := "created_at"
 	if f.SortBy != "" && allowedSort[f.SortBy] {
 		sort = f.SortBy
@@ -120,7 +116,7 @@ func (r *Repo) GetSale(ctx context.Context, id int64) (*models.Sale, error) {
 	var s models.Sale
 	err := r.DB.QueryRowContext(ctx, q, id).Scan(&s.ID, &s.Kind, &s.Amount, &s.Category, &s.Note, &s.CreatedAt)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, fmt.Errorf("get sale: %w", err)
@@ -156,14 +152,11 @@ func (r *Repo) DeleteSale(ctx context.Context, id int64) error {
 	return nil
 }
 
-/* Аналитика */
-// GetAnalytics returns count, sum, avg, median, 90th percentile for given period and optional kind/category filter.
 func (r *Repo) GetAnalytics(ctx context.Context, from, to *time.Time, kind *models.Kind, category *string) (models.Analytics, error) {
 	var a models.Analytics
 	a.From = from
 	a.To = to
 
-	// base where
 	where := "WHERE 1=1"
 	args := []interface{}{}
 	idx := 1
@@ -188,7 +181,6 @@ func (r *Repo) GetAnalytics(ctx context.Context, from, to *time.Time, kind *mode
 		idx++
 	}
 
-	// count, sum, avg
 	q1 := fmt.Sprintf(`SELECT COUNT(*)::bigint, COALESCE(SUM(amount),0)::numeric::float8, COALESCE(AVG(amount),0)::numeric::float8
         FROM sales %s`, where)
 	row := r.DB.QueryRowContext(ctx, q1, args...)
@@ -207,8 +199,6 @@ func (r *Repo) GetAnalytics(ctx context.Context, from, to *time.Time, kind *mode
 		a.Avg = avg.Float64
 	}
 
-	// median and 90th percentile — use aggregate percentile_cont
-	// percentile_cont returns numeric; cast to float8
 	q2 := fmt.Sprintf(`SELECT
            COALESCE(percentile_cont(0.5) WITHIN GROUP (ORDER BY amount)::numeric::float8, 0),
            COALESCE(percentile_cont(0.9) WITHIN GROUP (ORDER BY amount)::numeric::float8, 0)
