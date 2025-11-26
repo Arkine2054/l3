@@ -19,14 +19,12 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// Подключение к базе и миграции внутри репозитория
 	repo, err := repository.NewImagesRepo()
 	if err != nil {
-		log.Fatal("❌ DB init failed:", err)
+		log.Fatal("DB init failed:", err)
 	}
 	defer repo.DB.Close()
 
-	// Kafka Writer (Producer)
 	kafkaBrokers := []string{os.Getenv("KAFKA_BROKER")}
 	if kafkaBrokers[0] == "" {
 		kafkaBrokers = []string{"kafka:9092"}
@@ -38,7 +36,6 @@ func main() {
 	})
 	defer kWriter.Close()
 
-	// Kafka Reader (Consumer) — наш фоновой воркер
 	kReader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  kafkaBrokers,
 		Topic:    "images",
@@ -50,7 +47,6 @@ func main() {
 
 	storageDir := "./data"
 
-	// Запуск фонового воркера обработки изображений
 	worker := &processor.Worker{
 		Repo:          repo,
 		Reader:        kReader,
@@ -59,20 +55,16 @@ func main() {
 	}
 	worker.Start(ctx)
 
-	// Обработчик загрузки
 	uploadHandler := &handlers.UploadHandler{
 		Repo:        repo,
 		KafkaWriter: kWriter,
 		StorageDir:  storageDir,
 	}
 
-	// HTTP роутер
 	r := mux.NewRouter()
 
-	// Статика для web интерфейса
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
 
-	// Статика для изображений
 	r.PathPrefix("/data/processed/").Handler(
 		http.StripPrefix("/data/processed/", http.FileServer(http.Dir("./data/processed"))),
 	)
@@ -83,17 +75,14 @@ func main() {
 		http.StripPrefix("/data/original/", http.FileServer(http.Dir("./data/original"))),
 	)
 
-	// Главная страница
 	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "web/templates/index.html")
 	})
 
-	// API
 	r.HandleFunc("/upload", uploadHandler.Upload).Methods("POST")
 	r.HandleFunc("/image/{id:[0-9]+}", uploadHandler.GetImage).Methods("GET")
 	r.HandleFunc("/image/{id:[0-9]+}", uploadHandler.DeleteImage).Methods("DELETE")
 
-	// Список изображений
 	r.HandleFunc("/images", func(w http.ResponseWriter, r *http.Request) {
 		images, err := repo.List()
 		if err != nil {
@@ -101,10 +90,12 @@ func main() {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(images)
+		err = json.NewEncoder(w).Encode(images)
+		if err != nil {
+			log.Printf("Error encoding json: %v", err)
+		}
 	}).Methods("GET")
 
-	// HTTP сервер
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -118,6 +109,6 @@ func main() {
 		WriteTimeout: 15 * time.Second,
 	}
 
-	log.Println("🚀 Server running on", srvAddr)
+	log.Println("Server running on", srvAddr)
 	log.Fatal(srv.ListenAndServe())
 }

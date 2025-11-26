@@ -24,7 +24,6 @@ type ImagesRepo struct {
 	DB *sql.DB
 }
 
-// NewImagesRepo — создаёт подключение к БД и запускает миграции
 func NewImagesRepo() (*ImagesRepo, error) {
 	host := os.Getenv("DB_HOST")
 	port := os.Getenv("DB_PORT")
@@ -64,7 +63,7 @@ func NewImagesRepo() (*ImagesRepo, error) {
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
 
-	log.Println("✅ Connected to DB and migrations applied successfully.")
+	log.Println("Connected to DB and migrations applied successfully.")
 	return repo, nil
 }
 
@@ -73,15 +72,13 @@ func (r *ImagesRepo) migrate(db *sql.DB) error {
 	if err := goose.SetDialect("postgres"); err != nil {
 		return err
 	}
-	log.Println("▶️ Running goose migrations from:", dir)
+	log.Println("Running goose migrations from:", dir)
 	if err := goose.Up(db, dir); err != nil {
 		return fmt.Errorf("migration failed: %v", err)
 	}
-	log.Println("✅ Migrations applied successfully")
+	log.Println("Migrations applied successfully")
 	return nil
 }
-
-// CRUD methods
 
 func (r *ImagesRepo) Create(storedPath string, filename string, format string) (int64, error) {
 	query := `

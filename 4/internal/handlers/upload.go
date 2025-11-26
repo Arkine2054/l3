@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -44,17 +45,15 @@ func (h *UploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ext := strings.ToLower(filepath.Ext(filename)) // .jpg, .png
-	format := strings.TrimPrefix(ext, ".")         // jpg, png
+	ext := strings.ToLower(filepath.Ext(filename))
+	format := strings.TrimPrefix(ext, ".")
 
-	// при вставке в БД
 	id, err := h.Repo.Create(path, filename, format)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
 
-	// Отправляем задачу в Kafka
 	msg := kafka.Message{
 		Value: []byte(strconv.Itoa(int(id))),
 	}
@@ -69,7 +68,10 @@ func (h *UploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		"status":   "uploaded",
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	err = json.NewEncoder(w).Encode(resp)
+	if err != nil {
+		log.Printf("failed to write response: %v", err)
+	}
 }
 
 func (h *UploadHandler) GetImage(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +82,6 @@ func (h *UploadHandler) GetImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 💬 новый метод Get() должен вернуть путь к файлу
 	image, err := h.Repo.GetByID(int64(id))
 	if err != nil {
 		http.Error(w, "not found", http.StatusNotFound)

@@ -10,6 +10,5 @@ CREATE TABLE IF NOT EXISTS images (
                                       created_at TIMESTAMP DEFAULT NOW(),
                                       updated_at TIMESTAMP DEFAULT NOW()
 );
--- make sure updated_at is updated on change (simple trigger optional)
 -- +goose Down
 DROP TABLE IF EXISTS images;
