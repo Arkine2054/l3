@@ -16,17 +16,14 @@ import (
 	"gitlab.com/arkine/l3/5/internal/service"
 )
 
-// Handlers связывает HTTP-роуты и сервис
 type Handlers struct {
 	svc *service.Service
 }
 
-// NewHandlers создаёт структуру для маршрутов
 func NewHandlers(svc *service.Service) *Handlers {
 	return &Handlers{svc: svc}
 }
 
-// RegisterRoutes регистрирует все маршруты HTTP API
 func (h *Handlers) RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/events", h.handleCreateEvent).Methods("POST")
 	r.HandleFunc("/events", h.handleListEvents).Methods("GET")
@@ -34,20 +31,14 @@ func (h *Handlers) RegisterRoutes(r *mux.Router) {
 	r.HandleFunc("/events/{id:[0-9]+}/book", h.handleBookSeat).Methods("POST")
 	r.HandleFunc("/events/{id:[0-9]+}/confirm", h.handleConfirmBooking).Methods("POST")
 
-	// статические файлы (простой UI)
 	fs := http.FileServer(http.Dir("./web"))
 	r.PathPrefix("/web/").Handler(http.StripPrefix("/web/", fs))
 }
 
-//
-// ====== Handlers ======
-//
-
-// handleCreateEvent — POST /events
 func (h *Handlers) handleCreateEvent(w http.ResponseWriter, r *http.Request) {
 	type request struct {
 		Title      string `json:"title"`
-		Date       string `json:"date"` // формат ISO 8601
+		Date       string `json:"date"`
 		TotalSeats int    `json:"total_seats"`
 	}
 
@@ -80,7 +71,6 @@ func (h *Handlers) handleCreateEvent(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, event)
 }
 
-// handleListEvents — GET /events
 func (h *Handlers) handleListEvents(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -95,7 +85,6 @@ func (h *Handlers) handleListEvents(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, events)
 }
 
-// handleGetEvent — GET /events/{id}
 func (h *Handlers) handleGetEvent(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
@@ -115,7 +104,6 @@ func (h *Handlers) handleGetEvent(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, event)
 }
 
-// handleBookSeat — POST /events/{id}/book
 func (h *Handlers) handleBookSeat(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(mux.Vars(r)["id"])
 	if err != nil {
@@ -154,7 +142,6 @@ func (h *Handlers) handleBookSeat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, booking)
 }
 
-// handleConfirmBooking — POST /events/{id}/confirm
 func (h *Handlers) handleConfirmBooking(w http.ResponseWriter, r *http.Request) {
 	type request struct {
 		BookingID int `json:"booking_id"`
@@ -181,11 +168,6 @@ func (h *Handlers) handleConfirmBooking(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "confirmed"})
 }
 
-//
-// ====== Вспомогательные функции ======
-//
-
-// writeJSON — универсальная отправка JSON-ответа
 func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

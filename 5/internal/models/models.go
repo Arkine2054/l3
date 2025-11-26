@@ -5,18 +5,15 @@ import (
 	"time"
 )
 
-// Event соответствует таблице events
 type Event struct {
-	ID         int       `db:"id" json:"id"`
-	Title      string    `db:"title" json:"title"`
-	Date       time.Time `db:"date" json:"date"`
-	TotalSeats int       `db:"total_seats" json:"total_seats"`
-	CreatedAt  time.Time `db:"created_at" json:"created_at"`
-	// AvailableSeats — дополнительное поле, вычисляемое репозиторием/сервисом
-	AvailableSeats int `db:"-" json:"available_seats"`
+	ID             int       `db:"id" json:"id"`
+	Title          string    `db:"title" json:"title"`
+	Date           time.Time `db:"date" json:"date"`
+	TotalSeats     int       `db:"total_seats" json:"total_seats"`
+	CreatedAt      time.Time `db:"created_at" json:"created_at"`
+	AvailableSeats int       `db:"-" json:"available_seats"`
 }
 
-// Booking соответствует таблице bookings
 type Booking struct {
 	ID        int          `db:"id" json:"id"`
 	EventID   int          `db:"event_id" json:"event_id"`

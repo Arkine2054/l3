@@ -1,5 +1,3 @@
--- migrations/0001_init.up.sql
-
 CREATE TABLE IF NOT EXISTS events (
                                       id SERIAL PRIMARY KEY,
                                       title TEXT NOT NULL,
@@ -17,6 +15,5 @@ CREATE TABLE IF NOT EXISTS bookings (
                                         updated_at TIMESTAMP NULL
 );
 
--- Indexes for read performance
 CREATE INDEX IF NOT EXISTS idx_bookings_event_paid ON bookings(event_id, paid);
 CREATE INDEX IF NOT EXISTS idx_events_date ON events(date);

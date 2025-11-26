@@ -28,8 +28,6 @@ Backend — Go, база данных — PostgreSQL, миграции — migra
 
 Удаляет просроченные брони.
 
-# Быстрый старт (Docker)
-
 # Структура проекта
 
 ```
@@ -111,7 +109,7 @@ Request:
 
 Открыть в браузере:
 
-**[http://localhost:8080/web](http://localhost:8080/web)**
+**(http://localhost:8080/web)**
 
 Доступные страницы:
 
@@ -123,13 +121,6 @@ Request:
 | Забронировать место | `/web/book.html?id=1`    |
 | Подтвердить бронь   | `/web/confirm.html?id=1` |
 
----
-# Миграции
-
-```
-migrate -path ./migrations -database "postgres://postgres:postgres@localhost:5432/events?sslmode=disable" up
-```
-
 # Тестирование
 
 ## Тесты API (ручное)
@@ -140,7 +131,7 @@ curl -X POST http://localhost:8080/events -d ...
 
 ## Тесты UI
 
-1. Открыть [http://localhost:8080/web](http://localhost:8080/web)
+1. Открыть (http://localhost:8080/web)
 2. Создать событие
 3. Забронировать
 4. Подтвердить

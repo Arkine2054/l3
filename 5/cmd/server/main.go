@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -18,7 +19,6 @@ import (
 )
 
 func main() {
-	// --- Настройка окружения ---
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		log.Fatal("DATABASE_URL is not set")
@@ -38,7 +38,6 @@ func main() {
 		}
 	}
 
-	// --- Подключение к базе ---
 	db, err := repository.ConnectPostgres(dsn)
 	if err != nil {
 		log.Fatalf("DB connection failed: %v", err)
@@ -50,14 +49,11 @@ func main() {
 	svc.StartBookingCleaner(cleanInterval)
 	defer svc.StopBookingCleaner()
 
-	// --- HTTP сервер ---
 	r := mux.NewRouter()
 
-	// API маршруты
 	h := handlers.NewHandlers(svc)
 	h.RegisterRoutes(r)
 
-	// --- Отдача фронта ---
 	fs := http.FileServer(http.Dir("./web"))
 	r.PathPrefix("/web/").Handler(http.StripPrefix("/web/", fs))
 
@@ -66,7 +62,6 @@ func main() {
 		Handler: r,
 	}
 
-	// --- Graceful shutdown ---
 	idleConnsClosed := make(chan struct{})
 	go func() {
 		stop := make(chan os.Signal, 1)
@@ -81,7 +76,7 @@ func main() {
 	}()
 
 	log.Println("Server is running on :8080")
-	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("ListenAndServe error: %v", err)
 	}
 

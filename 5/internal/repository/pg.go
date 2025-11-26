@@ -15,17 +15,14 @@ var (
 	ErrNoSeatsAvailable = errors.New("no seats available")
 )
 
-// Repository инкапсулирует работу с PostgreSQL
 type Repository struct {
 	DB *sql.DB
 }
 
-// NewRepository создаёт новый репозиторий
 func NewRepository(db *sql.DB) *Repository {
 	return &Repository{DB: db}
 }
 
-// ConnectPostgres подключается к PostgreSQL
 func ConnectPostgres(dsn string) (*sql.DB, error) {
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
@@ -36,10 +33,6 @@ func ConnectPostgres(dsn string) (*sql.DB, error) {
 	}
 	return db, nil
 }
-
-//
-// ===== Работа с мероприятиями =====
-//
 
 func (r *Repository) ListEvents(ctx context.Context) ([]models.EventInfo, error) {
 	query := `
@@ -70,7 +63,6 @@ func (r *Repository) ListEvents(ctx context.Context) ([]models.EventInfo, error)
 	return events, nil
 }
 
-// CreateEvent добавляет новое мероприятие
 func (r *Repository) CreateEvent(ctx context.Context, e *models.Event) error {
 	query := `
 		INSERT INTO events (title, date, total_seats, created_at)
@@ -81,7 +73,6 @@ func (r *Repository) CreateEvent(ctx context.Context, e *models.Event) error {
 		Scan(&e.ID, &e.CreatedAt)
 }
 
-// GetEventByID возвращает мероприятие по ID
 func (r *Repository) GetEventByID(ctx context.Context, id int) (*models.Event, error) {
 	query := `
 		SELECT id, title, date, total_seats, created_at
@@ -96,7 +87,6 @@ func (r *Repository) GetEventByID(ctx context.Context, id int) (*models.Event, e
 	return &e, nil
 }
 
-// CountBookedSeats возвращает количество всех активных броней
 func (r *Repository) CountBookedSeats(ctx context.Context, eventID int) (int, error) {
 	query := `SELECT COUNT(*) FROM bookings WHERE event_id = $1;`
 	var count int
@@ -106,11 +96,6 @@ func (r *Repository) CountBookedSeats(ctx context.Context, eventID int) (int, er
 	return count, nil
 }
 
-//
-// ===== Работа с бронями =====
-//
-
-// CreateBooking создаёт бронь
 func (r *Repository) CreateBooking(ctx context.Context, eventID int, userName string) (*models.Booking, error) {
 	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -118,7 +103,6 @@ func (r *Repository) CreateBooking(ctx context.Context, eventID int, userName st
 	}
 	defer tx.Rollback()
 
-	// Проверяем количество мест
 	var total, booked int
 	if err := tx.QueryRowContext(ctx, `SELECT total_seats FROM events WHERE id = $1;`, eventID).Scan(&total); err != nil {
 		return nil, err
@@ -154,7 +138,6 @@ func (r *Repository) CreateBooking(ctx context.Context, eventID int, userName st
 	return booking, nil
 }
 
-// MarkBookingPaid помечает бронь как оплаченную
 func (r *Repository) MarkBookingPaid(ctx context.Context, bookingID int) error {
 	query := `
 		UPDATE bookings
@@ -165,7 +148,6 @@ func (r *Repository) MarkBookingPaid(ctx context.Context, bookingID int) error {
 	return err
 }
 
-// DeleteExpiredBookings удаляет неоплаченные брони старше expirationTime
 func (r *Repository) DeleteExpiredBookings(ctx context.Context, expirationTime time.Time) error {
 	query := `
 		DELETE FROM bookings

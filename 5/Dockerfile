@@ -1,19 +1,14 @@
-# syntax=docker/dockerfile:1
 FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
-# Устанавливаем зависимости
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Копируем исходники
 COPY . .
 
-# Собираем бинарь
 RUN CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/server
 
-# Финальный образ
 FROM alpine:latest
 
 WORKDIR /app
