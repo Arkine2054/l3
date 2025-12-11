@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Warehouse App — Modern UI</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #101216;
+            --card: #0f1720;
+            --muted: #9aa4b2;
+            --accent: #0ea5a4;
+            --text: #e6eef6;
+        }
+        body.dark {
+            background: var(--bg);
+            color: var(--text);
+        }
+        .dark .card { background: var(--card); color: var(--text); border: 1px solid rgba(255,255,255,0.04); }
+        .dark .form-control { background: rgba(255,255,255,0.02); color: var(--text); border: 1px solid rgba(255,255,255,0.04); }
+        .dark table { color: var(--text); }
+        .sort-ind { width: 10px; display:inline-block; text-align:center; margin-left:6px; opacity:.7;}
+        .clickable { cursor:pointer; user-select:none; }
+        .muted { color: var(--muted); }
+        .btn-accent { background: var(--accent); border-color: var(--accent); color: #022; }
+        .pagination .page-link { color: var(--text); background: transparent; border: 1px solid rgba(255,255,255,0.04); }
+        .nowrap { white-space: nowrap; }
+    </style>
+</head>
+<body class="dark">
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Warehouse App</h2>
+        <div>
+            <button id="themeToggle" class="btn btn-sm btn-outline-light me-2">Switch theme</button>
+            <span id="userInfo" class="muted"></span>
+            <button id="logoutBtn" class="btn btn-sm btn-outline-light ms-2 d-none">Logout</button>
+        </div>
+    </div>
+
+    <div id="authCard" class="card mb-4 p-3">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <h5>Register</h5>
+                <input id="regUsername" class="form-control mb-2" placeholder="Username">
+                <input id="regPassword" type="password" class="form-control mb-2" placeholder="Password">
+                <select id="regRole" class="form-select mb-2">
+                    <option value="viewer">viewer</option>
+                    <option value="manager">manager</option>
+                </select>
+                <button id="registerBtn" class="btn btn-accent">Register</button>
+            </div>
+
+            <div class="col-md-6">
+                <h5>Login</h5>
+                <input id="loginUsername" class="form-control mb-2" placeholder="Username">
+                <input id="loginPassword" type="password" class="form-control mb-2" placeholder="Password">
+                <div class="d-flex gap-2">
+                    <button id="loginBtn" class="btn btn-success">Login</button>
+                    <button id="fillAdmin" class="btn btn-outline-light">Fill admin</button>
+                </div>
+                <div class="mt-2 muted small">For dev: register as viewer/manager; admin seeded via migrations.</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="appCard" class="card p-3 mb-4 d-none">
+        <div class="row align-items-center mb-2">
+            <div class="col-md-4">
+                <input id="searchName" class="form-control" placeholder="Search by name">
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+                <button id="searchBtn" class="btn btn-outline-light">Search</button>
+                <button id="refreshBtn" class="btn btn-outline-light">Refresh</button>
+            </div>
+            <div class="col-md-4 text-end">
+                <button id="openAdd" class="btn btn-accent">Add item</button>
+            </div>
+        </div>
+
+        <div class="table-responsive mb-2">
+            <table id="itemsTable" class="table table-sm table-hover">
+                <thead>
+                <tr>
+                    <th class="clickable" data-col="id">ID <span class="sort-ind" id="si-id"></span></th>
+                    <th class="clickable" data-col="name">Name <span class="sort-ind" id="si-name"></span></th>
+                    <th class="clickable" data-col="quantity">Quantity <span class="sort-ind" id="si-quantity"></span></th>
+                    <th class="clickable" data-col="price">Price <span class="sort-ind" id="si-price"></span></th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <label>Page size:
+                    <select id="pageSize" class="form-select form-select-sm d-inline-block w-auto">
+                        <option>5</option><option selected>10</option><option>20</option><option>50</option>
+                    </select>
+                </label>
+            </div>
+            <nav>
+                <ul id="pagination" class="pagination pagination-sm mb-0"></ul>
+            </nav>
+        </div>
+
+        <div class="card mt-3 p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="mb-0">History for item <span id="histItemLabel" class="fw-bold">—</span></h5>
+                <div class="d-flex gap-2 align-items-center">
+                    <input id="fromDate" type="date" class="form-control form-control-sm">
+                    <input id="toDate" type="date" class="form-control form-control-sm">
+                    <button id="applyHist" class="btn btn-outline-light btn-sm">Apply</button>
+                    <button id="exportCSV" class="btn btn-outline-success btn-sm">Export CSV</button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table id="historyTable" class="table table-sm">
+                    <thead>
+                    <tr><th>ID</th><th>Action</th><th>User</th><th>Old</th><th>New</th><th>Timestamp</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="modal fade" id="itemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header">
+                <h5 id="itemModalTitle" class="modal-title">Add Item</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input id="mItemId" type="hidden">
+                <label class="form-label">Name</label>
+                <input id="mItemName" class="form-control mb-2">
+                <label class="form-label">Quantity</label>
+                <input id="mItemQuantity" type="number" class="form-control mb-2">
+                <label class="form-label">Price</label>
+                <input id="mItemPrice" type="number" step="0.01" class="form-control mb-2">
+            </div>
+            <div class="modal-footer">
+                <button id="saveModalBtn" class="btn btn-accent">Save</button>
+                <button class="btn btn-outline-light" data-bs-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    (() => {
+        const BASE = "http://localhost:8091";
+
+        let token = null;
+        let items = [];
+        let sortBy = "id";
+        let sortDir = "asc";
+        let currentPage = 1;
+        let pageSize = 10;
+        let selectedItemForHistory = null;
+
+        const authCard = document.getElementById("authCard");
+        const appCard = document.getElementById("appCard");
+        const userInfo = document.getElementById("userInfo");
+        const logoutBtn = document.getElementById("logoutBtn");
+
+        const itemsTbody = document.querySelector("#itemsTable tbody");
+        const historyTbody = document.querySelector("#historyTable tbody");
+        const histItemLabel = document.getElementById("histItemLabel");
+
+        const pageSizeSel = document.getElementById("pageSize");
+        const paginationEl = document.getElementById("pagination");
+
+        const itemModal = new bootstrap.Modal(document.getElementById("itemModal"));
+        const itemModalTitle = document.getElementById("itemModalTitle");
+
+        document.getElementById("themeToggle").onclick = () => {
+            document.body.classList.toggle("dark");
+        };
+
+        function esc(s){ return String(s===null||s===undefined?"":s); }
+
+        document.getElementById("fillAdmin").onclick = () => {
+            document.getElementById("loginUsername").value = "admin";
+            document.getElementById("loginPassword").value = "admin";
+        };
+
+        document.getElementById("registerBtn").onclick = async () => {
+            const u = document.getElementById("regUsername").value.trim();
+            const p = document.getElementById("regPassword").value.trim();
+            const role = document.getElementById("regRole").value;
+            if(!u||!p){ alert("username+password"); return; }
+            const res = await fetch(BASE + "/register", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username:u,password:p,role})});
+            if(res.ok){ alert("registered"); } else { const d=await res.json(); alert("register failed: "+(d.error||JSON.stringify(d))); }
+        };
+
+        document.getElementById("loginBtn").onclick = async () => {
+            const u = document.getElementById("loginUsername").value.trim();
+            const p = document.getElementById("loginPassword").value.trim();
+            if(!u||!p){ alert("username+password"); return; }
+            const res = await fetch(BASE + "/login", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({username:u,password:p})});
+            const d = await res.json();
+            if(d.token){
+                token = d.token;
+                authCard.classList.add("d-none");
+                appCard.classList.remove("d-none");
+                logoutBtn.classList.remove("d-none");
+                userInfo.textContent = u;
+                await reloadItems();
+            } else {
+                alert("login failed: "+(d.error||JSON.stringify(d)));
+            }
+        };
+
+        logoutBtn.onclick = () => {
+            token = null;
+            authCard.classList.remove("d-none");
+            appCard.classList.add("d-none");
+            logoutBtn.classList.add("d-none");
+            userInfo.textContent = "";
+        };
+
+        async function fetchItems() {
+            const q = document.getElementById("searchName").value.trim();
+            let url = BASE + "/items";
+            if(q) url += "?name=" + encodeURIComponent(q);
+            const res = await fetch(url, { headers: token ? {"Authorization":"Bearer "+token} : {} });
+            if(res.status===401){ alert("Unauthorized — check token"); return []; }
+            return await res.json();
+        }
+
+        async function reloadItems(){
+            items = await fetchItems() || [];
+            currentPage = 1;
+            renderItems();
+        }
+
+        function compare(a,b,field){
+            if(a[field]===b[field]) return 0;
+            if(a[field]===null||a[field]===undefined) return -1;
+            if(b[field]===null||b[field]===undefined) return 1;
+            if(typeof a[field] === "string") return a[field].localeCompare(b[field]);
+            return a[field] < b[field] ? -1 : 1;
+        }
+
+        function sortItems() {
+            items.sort((A,B) => {
+                const r = compare(A,B,sortBy);
+                return sortDir==="asc"? r : -r;
+            });
+        }
+
+        function renderItems(){
+            sortItems();
+            pageSize = parseInt(pageSizeSel.value,10) || 10;
+            const total = items.length;
+            const pages = Math.max(1, Math.ceil(total / pageSize));
+            if(currentPage>pages) currentPage = pages;
+            const start = (currentPage-1)*pageSize;
+            const pageItems = items.slice(start, start+pageSize);
+
+            itemsTbody.innerHTML = "";
+            for(const it of pageItems){
+                const tr = document.createElement("tr");
+                tr.dataset.itemId = it.id;
+                tr.innerHTML = `
+        <td class="nowrap">${esc(it.id)}</td>
+        <td>${esc(it.name)}</td>
+        <td>${esc(it.quantity)}</td>
+        <td>${esc(it.price)}</td>
+        <td class="nowrap">
+          <button class="btn btn-sm btn-light btn-edit">Edit</button>
+          <button class="btn btn-sm btn-danger btn-delete">Delete</button>
+          <button class="btn btn-sm btn-info btn-history">History</button>
+        </td>`;
+                itemsTbody.appendChild(tr);
+            }
+
+            renderPagination(pages, currentPage);
+            ["id","name","quantity","price"].forEach(c=>{
+                document.getElementById("si-"+c).textContent = (c===sortBy? (sortDir==="asc"?"▲":"▼") : "");
+            });
+        }
+
+        function renderPagination(pages, active){
+            paginationEl.innerHTML = "";
+            const prev = createPageItem("«", Math.max(1, active-1), active===1);
+            paginationEl.appendChild(prev);
+            const window = 5;
+            let start = Math.max(1, active - Math.floor(window/2));
+            let end = Math.min(pages, start + window - 1);
+            if(end - start + 1 < window) start = Math.max(1, end - window + 1);
+            for(let i=start;i<=end;i++){
+                const li = createPageItem(i, i, i===active);
+                paginationEl.appendChild(li);
+            }
+            const next = createPageItem("»", Math.min(pages, active+1), active===pages);
+            paginationEl.appendChild(next);
+        }
+
+        function createPageItem(label, page, disabled){
+            const li = document.createElement("li");
+            li.className = "page-item" + (disabled? " disabled":"");
+            const a = document.createElement("a");
+            a.className = "page-link";
+            a.href = "#";
+            a.textContent = label;
+            a.onclick = (e)=>{ e.preventDefault(); if(!disabled){ currentPage = page; renderItems(); } };
+            li.appendChild(a);
+            return li;
+        }
+
+        itemsTbody.addEventListener("click", async (e)=>{
+            const tr = e.target.closest("tr");
+            if(!tr) return;
+            const id = tr.dataset.itemId;
+            if(e.target.classList.contains("btn-edit")){
+                const it = items.find(x=>String(x.id)===String(id));
+                if(!it) return;
+                document.getElementById("mItemId").value = it.id;
+                document.getElementById("mItemName").value = it.name;
+                document.getElementById("mItemQuantity").value = it.quantity;
+                document.getElementById("mItemPrice").value = it.price;
+                itemModalTitle.textContent = "Edit item";
+                itemModal.show();
+            } else if(e.target.classList.contains("btn-delete")){
+                if(!confirm("Delete?")) return;
+                await fetch(BASE + "/items/" + id, { method:"DELETE", headers: {"Authorization":"Bearer "+token} });
+                await reloadItems();
+                if(String(selectedItemForHistory) === String(id)){
+                    historyTbody.innerHTML = ""; histItemLabel.textContent = "—"; selectedItemForHistory=null;
+                }
+            } else if(e.target.classList.contains("btn-history")){
+                selectedItemForHistory = id;
+                histItemLabel.textContent = id;
+                await loadHistoryFor(id);
+            }
+        });
+
+        document.getElementById("openAdd").onclick = ()=>{
+            document.getElementById("mItemId").value = "";
+            document.getElementById("mItemName").value = "";
+            document.getElementById("mItemQuantity").value = 0;
+            document.getElementById("mItemPrice").value = 0;
+            itemModalTitle.textContent = "Add item";
+            itemModal.show();
+        };
+
+        document.getElementById("saveModalBtn").onclick = async ()=>{
+            const id = document.getElementById("mItemId").value;
+            const name = document.getElementById("mItemName").value.trim();
+            const quantity = parseInt(document.getElementById("mItemQuantity").value||0);
+            const price = parseFloat(document.getElementById("mItemPrice").value||0);
+            if(!name){ alert("name required"); return; }
+            const method = id ? "PUT" : "POST";
+            const url = id ? BASE + "/items/" + id : BASE + "/items";
+            const res = await fetch(url, { method, headers: {"Content-Type":"application/json","Authorization":"Bearer "+token}, body: JSON.stringify({name,quantity,price})});
+            if(!res.ok){ const d=await res.json(); alert("Error: "+(d.error||JSON.stringify(d))); return; }
+            itemModal.hide();
+            await reloadItems();
+        };
+
+        document.getElementById("searchBtn").onclick = ()=> reloadItems();
+        document.getElementById("refreshBtn").onclick = ()=> reloadItems();
+
+        document.querySelectorAll("#itemsTable thead th.clickable").forEach(th=>{
+            th.onclick = ()=>{
+                const col = th.dataset.col;
+                if(sortBy === col) sortDir = sortDir==="asc" ? "desc":"asc"; else { sortBy = col; sortDir="asc"; }
+                renderItems();
+            };
+        });
+
+        pageSizeSel.onchange = ()=> { currentPage = 1; renderItems(); };
+
+        async function loadHistoryFor(id){
+            const from = document.getElementById("fromDate").value;
+            const to = document.getElementById("toDate").value;
+            let url = BASE + "/history/" + id;
+            const params = [];
+            if(from) params.push("from="+from);
+            if(to) params.push("to="+to);
+            if(params.length) url += "?"+params.join("&");
+            const res = await fetch(url, { headers: {"Authorization":"Bearer "+token} });
+            if(!res.ok){ historyTbody.innerHTML=""; alert("Can't load history"); return; }
+            const data = await res.json();
+            historyTbody.innerHTML = "";
+            data.forEach(h=>{
+                const tr = document.createElement("tr");
+                tr.innerHTML = `
+        <td>${esc(h.id)}</td>
+        <td>${esc(h.action)}</td>
+        <td>${esc(h.user_id)}</td>
+        <td><pre style="white-space:pre-wrap;max-width:350px">${esc(JSON.stringify(h.old_data))}</pre></td>
+        <td><pre style="white-space:pre-wrap;max-width:350px">${esc(JSON.stringify(h.new_data))}</pre></td>
+        <td>${h.timestamp? new Date(h.timestamp).toLocaleString() : ""}</td>`;
+                historyTbody.appendChild(tr);
+            });
+        }
+
+        document.getElementById("applyHist").onclick = ()=> {
+            if(selectedItemForHistory) loadHistoryFor(selectedItemForHistory);
+        };
+
+        document.getElementById("exportCSV").onclick = ()=>{
+            const rows = Array.from(document.querySelectorAll("#historyTable tbody tr"));
+            if(rows.length===0){ alert("No history"); return; }
+            const csv = rows.map(r => Array.from(r.cells).map(c=>`"${c.textContent.replace(/"/g,'""')}"`).join(",")).join("\n");
+            const blob = new Blob([csv], {type:"text/csv"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url; a.download = `history_item_${selectedItemForHistory||"unknown"}.csv`; a.click();
+            URL.revokeObjectURL(url);
+        };
+
+        (async ()=>{
+            document.body.classList.add("dark");
+            await reloadItems().catch(()=>{ /* ignore if unauthorized */ });
+        })();
+
+    })();
+</script>
+</body>
+</html>

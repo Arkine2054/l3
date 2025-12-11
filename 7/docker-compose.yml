@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: warehouse-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: warehouse
+    ports:
+      - "5441:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 2s
+      retries: 10
+
+  app:
+    build: .
+    container_name: warehouse-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/warehouse?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:-secret}
+    ports:
+      - "8091:8080"
+    command: ["./server"]
+    volumes:
+      - ./web:/app/web:ro
+      - ./migrate:/app/migrate:ro
+
+volumes:
+  postgres-data:
