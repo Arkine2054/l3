@@ -18,7 +18,7 @@
 * Поиск и сортировка
 * Постраничный вывод
 
-### 🌐 Web-интерфейс (Bootstrap + JS)
+### Web-интерфейс (Bootstrap + JS)
 
 * Темная тема
 * Модальное окно редактирования
@@ -55,7 +55,7 @@ docker-compose up --build
 * Frontend → [http://localhost:8091]
 * PostgreSQL → `localhost:5432`
 
-## 🔥 API
+## API
 
 ### Auth
 
