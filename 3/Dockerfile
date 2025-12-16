@@ -16,10 +16,9 @@ WORKDIR /app
 COPY --from=builder /app/server .
 
 COPY web/templates ./web/templates
-COPY web/static ./web/static
 
 COPY internal/migrations ./migrations
 
-EXPOSE 8080
+EXPOSE 8086
 
 ENTRYPOINT ["./server"]

@@ -22,6 +22,7 @@ services:
       DB_USER: postgres1
       DB_PASSWORD: postgres1
       DB_NAME: comments
+      PORT: 8080
     depends_on:
       - db
     ports:

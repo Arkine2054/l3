@@ -4,64 +4,21 @@
     <meta charset="UTF-8">
     <title>Комментарии</title>
     <style>
-        body {
-            font-family: system-ui, sans-serif;
-            margin: 20px;
-            background-color: #f5f6fa;
-        }
-        h1 {
-            color: #333;
-        }
-        .comment {
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            padding: 10px 15px;
-            margin: 10px 0;
-        }
-        .reply {
-            margin-left: 20px;
-            border-left: 2px solid #ccc;
-            padding-left: 10px;
-        }
-        .author {
-            font-weight: bold;
-            color: #0055aa;
-        }
-        .controls {
-            margin-top: 6px;
-        }
-        button {
-            margin-right: 5px;
-            padding: 4px 8px;
-            border: none;
-            border-radius: 5px;
-            background: #0078d7;
-            color: white;
-            cursor: pointer;
-        }
-        button.delete {
-            background: #d9534f;
-        }
-        button:hover {
-            opacity: 0.9;
-        }
-        input, textarea {
-            width: 100%;
-            margin-top: 5px;
-            margin-bottom: 10px;
-            padding: 8px;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-        }
-        #searchBox {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-        }
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f6fa; }
+        h1 { color: #333; }
+        .comment { background: white; border:1px solid #ddd; border-radius:6px; padding:10px; margin:10px 0; }
+        .comment .children { margin-left: 20px; }
+        .author { font-weight: bold; color: #0055aa; }
+        .controls { margin-top: 6px; }
+        button { margin-right: 5px; padding:4px 8px; border:none; border-radius:5px; background:#0078d7; color:white; cursor:pointer; }
+        button.delete { background:#d9534f; }
+        button:hover { opacity:0.9; }
+        input, textarea { width:100%; margin-top:5px; margin-bottom:10px; padding:8px; border-radius:5px; border:1px solid #ccc; }
+        #searchBox { display:flex; gap:10px; margin-bottom:20px; }
     </style>
 </head>
 <body>
+
 <h1>Комментарии</h1>
 
 <div id="searchBox">
@@ -70,75 +27,92 @@
     <button onclick="resetSearch()">Сбросить</button>
 </div>
 
-<div id="comments"></div>
+<div id="comments-container"></div>
 
 <h3>Добавить комментарий</h3>
-<input id="author" placeholder="Ваше имя">
-<textarea id="content" placeholder="Ваш комментарий..."></textarea>
-<button onclick="createComment()">Отправить</button>
+<input id="new-author" placeholder="Ваше имя">
+<textarea id="new-content" placeholder="Ваш комментарий..."></textarea>
+<button onclick="addComment(null)">Отправить</button>
 
 <script>
     async function loadComments(search = "") {
         let url = '/api/comments';
         if (search) url += `?search=${encodeURIComponent(search)}`;
         const res = await fetch(url);
-        if (!res.ok) {
-            console.error("Ошибка при загрузке:", res.statusText);
-            return;
-        }
+        if (!res.ok) return console.error("Ошибка при загрузке:", res.statusText);
         const data = await res.json();
-        const container = document.getElementById('comments');
-        container.innerHTML = renderComments(data);
+        const container = document.getElementById('comments-container');
+        container.innerHTML = '';
+        data.forEach(c => renderComment(c, container));
     }
 
-    function renderComments(comments, level = 0) {
-        return comments.map(c => `
-        <div class="comment reply" style="margin-left:${level * 20}px">
-          <div class="author">${c.author}</div>
-          <div class="content">${c.content}</div>
-          <div class="controls">
-            <button onclick="replyTo(${c.id})">Ответить</button>
-            <button class="delete" onclick="deleteComment(${c.id})">Удалить</button>
-          </div>
-          ${c.children && c.children.length ? renderComments(c.children, level + 1) : ''}
+    function renderComment(comment, container) {
+        const div = document.createElement('div');
+        div.className = 'comment';
+        div.dataset.id = comment.id;
+
+        div.innerHTML = `
+        <div class="author">${comment.author || 'Аноним'}</div>
+        <div class="content">${comment.content}</div>
+        <div class="controls">
+            <button onclick="showReplyBox(${comment.id}, this)">Ответить</button>
+            <button class="delete" onclick="deleteComment(${comment.id})">Удалить</button>
         </div>
-      `).join('');
+    `;
+
+        const childrenDiv = document.createElement('div');
+        childrenDiv.className = 'children';
+        div.appendChild(childrenDiv);
+        container.appendChild(div);
+
+        if (comment.children && comment.children.length) {
+            comment.children.forEach(child => renderComment(child, childrenDiv));
+        }
     }
 
-    function replyTo(parentId) {
-        const author = prompt("Ваше имя:");
-        const content = prompt("Ваш ответ:");
-        if (!author || !content) return;
+    function addComment(parentId) {
+        const content = parentId ? document.getElementById(`reply-content-${parentId}`).value :
+            document.getElementById('new-content').value;
+        const author  = parentId ? document.getElementById(`reply-author-${parentId}`).value :
+            document.getElementById('new-author').value;
+        if (!content.trim()) return alert('Введите текст комментария');
+
         fetch('/api/comments', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ parent_id: parentId, author, content })
-        }).then(() => loadComments());
-    }
-
-    function deleteComment(id) {
-        if (!confirm("Удалить комментарий и все ответы?")) return;
-        fetch('/api/comments/' + id, { method: 'DELETE' }).then(() => loadComments());
-    }
-
-    function createComment() {
-        const author = document.getElementById('author').value.trim();
-        const content = document.getElementById('content').value.trim();
-        if (!author || !content) return alert("Заполните имя и комментарий!");
-        fetch('/api/comments', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ author, content })
         }).then(() => {
-            document.getElementById('author').value = "";
-            document.getElementById('content').value = "";
+            if (!parentId) {
+                document.getElementById('new-author').value = "";
+                document.getElementById('new-content').value = "";
+            } else {
+                document.getElementById(`reply-box-${parentId}`).remove();
+            }
             loadComments();
         });
     }
 
+    function deleteComment(id) {
+        if (!confirm('Удалить этот комментарий и все ответы?')) return;
+        fetch(`/api/comments/${id}`, { method: 'DELETE' })
+            .then(() => loadComments());
+    }
+
+    function showReplyBox(id, btn) {
+        if (document.getElementById(`reply-box-${id}`)) return;
+        const box = document.createElement('div');
+        box.id = `reply-box-${id}`;
+        box.innerHTML = `
+        <textarea id="reply-content-${id}" placeholder="Ваш ответ"></textarea>
+        <input type="text" id="reply-author-${id}" placeholder="Ваше имя">
+        <button onclick="addComment(${id})">Отправить</button>
+    `;
+        btn.parentNode.appendChild(box);
+    }
+
     function searchComments() {
         const term = document.getElementById('search').value.trim();
-        if (term) loadComments(term);
+        loadComments(term);
     }
 
     function resetSearch() {

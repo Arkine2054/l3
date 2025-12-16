@@ -1,13 +1,15 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
+	"os"
 
-	"github.com/gorilla/mux"
 	"gitlab.com/arkine/l3/3/internal/db"
 	"gitlab.com/arkine/l3/3/internal/handlers"
 	"gitlab.com/arkine/l3/3/internal/repository"
+	"gitlab.com/arkine/l3/3/internal/router"
 )
 
 func main() {
@@ -15,7 +17,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer database.Close()
+	defer func(database *sql.DB) {
+		err := database.Close()
+		if err != nil {
+			log.Printf("Error closing database connection: %v", err)
+		}
+	}(database)
 
 	if err := db.Migrate(database); err != nil {
 		log.Fatal("migration failed:", err)
@@ -24,19 +31,15 @@ func main() {
 	repo := &repository.CommentRepo{DB: database}
 	handler := &handlers.CommentHandler{Repo: repo}
 
-	r := mux.NewRouter()
+	r := router.NewRouter(handler)
 
-	api := r.PathPrefix("/api").Subrouter()
-	api.HandleFunc("/comments", handler.Create).Methods("POST")
-	api.HandleFunc("/comments", handler.List).Methods("GET")
-	api.HandleFunc("/comments/{id:[0-9]+}", handler.Delete).Methods("DELETE")
-
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
-
-	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "web/templates/index.html")
-	})
-
-	log.Println("Server running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", r))
+	srvAddr := ":" + os.Getenv("PORT")
+	if srvAddr == ":" {
+		srvAddr = ":8080"
+	}
+	log.Println("Server running on", srvAddr)
+	err = http.ListenAndServe(srvAddr, r)
+	if err != nil {
+		log.Printf("Error starting server: %v", err)
+	}
 }
