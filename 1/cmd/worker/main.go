@@ -39,14 +39,32 @@ func main() {
 	if err := cacheClient.Ping(ctx); err != nil {
 		log.Fatalf("redis connection failed: %v", err)
 	}
-	defer cacheClient.Close()
+
+	defer func(cacheClient *cache.Client) {
+		err := cacheClient.Close()
+		if err != nil {
+			log.Fatalf("redis connection close failed: %v", err)
+		}
+	}(cacheClient)
 
 	conn, ch, err := queue.Connect(rabbitURL)
+
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer conn.Close()
-	defer ch.Close()
+	defer func(conn *amqp.Connection) {
+		err := conn.Close()
+		if err != nil {
+			log.Printf("close connection failed: %v", err)
+		}
+	}(conn)
+
+	defer func(ch *amqp.Channel) {
+		err := ch.Close()
+		if err != nil {
+			log.Printf("close channel failed: %v", err)
+		}
+	}(ch)
 
 	senders := make(map[string]service.Sender)
 

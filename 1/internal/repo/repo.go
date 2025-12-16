@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -16,6 +17,24 @@ type Repo struct {
 
 func New(db *sql.DB) *Repo {
 	return &Repo{DB: db}
+}
+
+func Connect(postgresURL string) (*sql.DB, error) {
+	if postgresURL == "" {
+		return nil, fmt.Errorf("POSTGRES_URL is empty")
+	}
+
+	db, err := sql.Open("postgres", postgresURL)
+	if err != nil {
+		return nil, fmt.Errorf("sql.Open failed: %w", err)
+	}
+
+	if err := db.Ping(); err != nil {
+		return nil, fmt.Errorf("db ping failed: %w", err)
+	}
+
+	log.Println("PostgreSQL connected successfully")
+	return db, nil
 }
 
 func (r *Repo) CreateNotification(ctx context.Context, n *model.Notification) (int64, error) {
@@ -41,7 +60,7 @@ func (r *Repo) GetNotification(ctx context.Context, id int64) (*model.Notificati
 		 FROM notifications WHERE id=$1`, id).
 		Scan(&n.ID, &n.Recipient, &n.Channel, &n.Message, &n.SendAt, &n.Status, &n.Attempts, &lastErr, &n.CreatedAt)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		log.Printf("GetNotification failed for id=%d: %v", id, err)
