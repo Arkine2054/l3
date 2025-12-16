@@ -16,8 +16,6 @@ func NewRouter(h *handlers.CommentHandler) *mux.Router {
 	api.HandleFunc("/comments", h.List).Methods("GET")
 	api.HandleFunc("/comments/{id:[0-9]+}", h.Delete).Methods("DELETE")
 
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
-
 	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "web/templates/index.html")
 	})

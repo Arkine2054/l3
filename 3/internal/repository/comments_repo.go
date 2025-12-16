@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"log"
 
 	"gitlab.com/arkine/l3/3/internal/models"
 )
@@ -37,44 +38,43 @@ func (r *CommentRepo) List() ([]*models.Comment, error) {
 	rows, err := r.DB.Query(`
 		SELECT id, parent_id, author, content, created_at
 		FROM comments
-		ORDER BY created_at
+		ORDER BY created_at ASC
 	`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			log.Printf("error closing list rows: %v", err)
+		}
+	}(rows)
 
-	all := []*models.Comment{}
-	lookup := make(map[int64]*models.Comment)
+	commentsMap := make(map[int64]*models.Comment)
+	var roots []*models.Comment
 
 	for rows.Next() {
 		var c models.Comment
 		var parentID sql.NullInt64
-		var author sql.NullString
-
-		if err := rows.Scan(&c.ID, &parentID, &author, &c.Content, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &parentID, &c.Author, &c.Content, &c.CreatedAt); err != nil {
 			return nil, err
 		}
 		if parentID.Valid {
 			c.ParentID = &parentID.Int64
 		}
-		if author.Valid {
-			c.Author = &author.String
-		}
 
 		c.Children = []*models.Comment{}
-		all = append(all, &c)
-		lookup[c.ID] = &c
-	}
+		commentsMap[c.ID] = &c
 
-	var roots []*models.Comment
-	for _, c := range all {
-		if c.ParentID != nil {
-			if parent, ok := lookup[*c.ParentID]; ok {
-				parent.Children = append(parent.Children, c)
-			}
+		if c.ParentID == nil {
+			roots = append(roots, &c)
 		} else {
-			roots = append(roots, c)
+			parent, ok := commentsMap[*c.ParentID]
+			if ok {
+				parent.Children = append(parent.Children, &c)
+			} else {
+				roots = append(roots, &c)
+			}
 		}
 	}
 
