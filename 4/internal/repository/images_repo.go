@@ -5,19 +5,20 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	_ "github.com/lib/pq"
 	"github.com/pressly/goose/v3"
 )
 
 type Image struct {
-	ID            int64   `json:"id"`
-	OrigFilename  string  `json:"orig_filename"`
-	StoredPath    *string `json:"stored_path"`
-	ProcessedPath *string `json:"processed_path"`
-	ThumbPath     *string `json:"thumb_path"`
-	Status        string  `json:"status"`
-	CreatedAt     string  `json:"created_at"`
+	ID            int64     `json:"id"`
+	OrigFilename  string    `json:"orig_filename"`
+	StoredPath    *string   `json:"stored_path"`
+	ProcessedPath *string   `json:"processed_path"`
+	ThumbPath     *string   `json:"thumb_path"`
+	Status        string    `json:"status"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 type ImagesRepo struct {
@@ -59,7 +60,9 @@ func NewImagesRepo() (*ImagesRepo, error) {
 	}
 
 	repo := &ImagesRepo{DB: db}
-	if err := repo.migrate(db); err != nil {
+
+	err = repo.migrate(db)
+	if err != nil {
 		return nil, fmt.Errorf("migration failed: %w", err)
 	}
 
@@ -108,14 +111,15 @@ func (r *ImagesRepo) UpdatePathsAndStatus(id int64, processedPath, thumbPath *st
 
 func (r *ImagesRepo) GetByID(id int64) (*Image, error) {
 	row := r.DB.QueryRow(`
-		SELECT id, stored_path, processed_path, thumb_path, status, created_at
+		SELECT id, orig_filename, stored_path, processed_path, thumb_path, status, created_at
 		FROM images WHERE id = $1
 	`, id)
 	var img Image
-	err := row.Scan(&img.ID, &img.StoredPath, &img.ProcessedPath, &img.ThumbPath, &img.Status, &img.CreatedAt)
+	err := row.Scan(&img.ID, &img.OrigFilename, &img.StoredPath, &img.ProcessedPath, &img.ThumbPath, &img.Status, &img.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
+
 	return &img, nil
 }
 
@@ -128,7 +132,12 @@ func (r *ImagesRepo) List() ([]Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			log.Printf("failed to close rows: %v", err)
+		}
+	}(rows)
 
 	var images []Image
 	for rows.Next() {

@@ -59,7 +59,7 @@ docker-compose.yml
 
 После запуска открой:
  
-**(http://localhost:8080)**
+**(http://localhost:8087)**
 
 ##API
 

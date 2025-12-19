@@ -1,4 +1,3 @@
-
 services:
   postgres:
     image: postgres:15
@@ -43,13 +42,13 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
-  app:
-    build: .
-    container_name: image-service
+  api:
+    build:
+      context: .
+      dockerfile: cmd/api/Dockerfile
+    container_name: image-api
     depends_on:
-      postgres:
-        condition: service_healthy
-      kafka:
+       kafka:
         condition: service_started
     environment:
       DB_HOST: postgres
@@ -62,6 +61,26 @@ services:
       WATERMARK_TEXT: "MyWatermark"
     ports:
       - "8087:8080"
+    volumes:
+      - ./data:/app/data
+
+  worker:
+    build:
+      context: .
+      dockerfile: cmd/worker/Dockerfile
+    container_name: image-worker
+    depends_on:
+       kafka:
+        condition: service_started
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres2
+      DB_PASSWORD: postgres2
+      DB_NAME: images
+      KAFKA_BROKER: kafka:29092
+      STORAGE_DIR: /app/data
+      WATERMARK_TEXT: "MyWatermark"
     volumes:
       - ./data:/app/data
 

@@ -1,76 +1,99 @@
 package handlers
 
 import (
-	"encoding/json"
+	"fmt"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/segmentio/kafka-go"
 
+	kafka2 "gitlab.com/arkine/l3/4/internal/kafka"
 	"gitlab.com/arkine/l3/4/internal/repository"
 )
 
 type UploadHandler struct {
 	Repo        *repository.ImagesRepo
-	KafkaWriter *kafka.Writer
+	KafkaWriter *kafka2.Producer
 	StorageDir  string
 }
 
+func NewUploadHandler(repo *repository.ImagesRepo, kw *kafka2.Producer, StorageDir string) *UploadHandler {
+	return &UploadHandler{
+		Repo:        repo,
+		KafkaWriter: kw,
+		StorageDir:  StorageDir,
+	}
+}
+
 func (h *UploadHandler) Upload(w http.ResponseWriter, r *http.Request) {
+
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		http.Error(w, "failed to read file", http.StatusBadRequest)
 		return
 	}
-	defer file.Close()
+	defer func(file multipart.File) {
+		err := file.Close()
+		if err != nil {
+			log.Println("Upload: failed to close file:", err)
+		}
+	}(file)
 
-	filename := header.Filename
-	path := filepath.Join(h.StorageDir, filename)
+	dirs := []string{
+		filepath.Join(h.StorageDir, "original"),
+		filepath.Join(h.StorageDir, "processed"),
+		filepath.Join(h.StorageDir, "thumbs"),
+	}
 
-	out, err := os.Create(path)
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			http.Error(w, "failed to create directory", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	storedPath := filepath.Join(h.StorageDir, "original", header.Filename)
+	out, err := os.Create(storedPath)
 	if err != nil {
 		http.Error(w, "failed to save file", http.StatusInternalServerError)
 		return
 	}
-	defer out.Close()
+	defer func(out *os.File) {
+		err := out.Close()
+		if err != nil {
+			log.Println("Upload: failed to close file:", err)
+		}
+	}(out)
 
 	if _, err := io.Copy(out, file); err != nil {
-		http.Error(w, "failed to write file", http.StatusInternalServerError)
+		http.Error(w, "failed to save file", http.StatusInternalServerError)
 		return
 	}
 
-	ext := strings.ToLower(filepath.Ext(filename))
-	format := strings.TrimPrefix(ext, ".")
-
-	id, err := h.Repo.Create(path, filename, format)
+	id, err := h.Repo.Create(storedPath, header.Filename, "jpeg")
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, "DB error", http.StatusInternalServerError)
 		return
 	}
 
 	msg := kafka.Message{
 		Value: []byte(strconv.Itoa(int(id))),
 	}
-	if err := h.KafkaWriter.WriteMessages(r.Context(), msg); err != nil {
-		http.Error(w, "kafka write error", http.StatusInternalServerError)
+	if err := h.KafkaWriter.Write(msg); err != nil {
+		http.Error(w, "Kafka error", http.StatusInternalServerError)
 		return
 	}
 
-	resp := map[string]interface{}{
-		"id":       id,
-		"filename": filename,
-		"status":   "uploaded",
-	}
-	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(resp)
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write([]byte(fmt.Sprintf("%d", id)))
 	if err != nil {
-		log.Printf("failed to write response: %v", err)
+		log.Printf("Upload: failed to write response: %s", err)
 	}
 }
 
