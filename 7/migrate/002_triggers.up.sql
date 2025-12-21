@@ -53,8 +53,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_items_delete ON items;
 CREATE TRIGGER trg_items_delete
-    AFTER DELETE ON items
+    BEFORE DELETE ON items
     FOR EACH ROW
 EXECUTE FUNCTION log_item_delete();
+

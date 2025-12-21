@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -24,38 +25,14 @@ func main() {
 	}
 	utils.SetJWTKey(secret)
 
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		dbURL = "postgres://postgres:postgres@postgres:5432/warehouse?sslmode=disable"
-	}
-
-	var db *sql.DB
-	var err error
-
-	for i := 0; i < 10; i++ {
-		db, err = sql.Open("postgres", dbURL)
-		if err == nil && db.Ping() == nil {
-			break
+	repo := repository.NewRepo()
+	defer func(DB *sql.DB) {
+		err := DB.Close()
+		if err != nil {
+			log.Println("[Startup] Failed to close DB:", err)
 		}
-		log.Println("[Startup] DB ping failed, retrying in 2s...")
-		time.Sleep(2 * time.Second)
-	}
-	if err != nil {
-		log.Fatal("[Startup] Cannot connect to DB:", err)
-	}
-	db.SetMaxOpenConns(20)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(60 * time.Minute)
+	}(repo.DB)
 
-	defer db.Close()
-	log.Println("[Startup] Connected to PostgreSQL")
-
-	if err := utils.RunMigrations(db, "migrate"); err != nil {
-		log.Fatal("[Startup] Migration failed:", err)
-	}
-	log.Println("[Startup] Migrations applied successfully!")
-
-	repo := repository.NewRepo(db)
 	h := handlers.NewHandler(repo)
 
 	r := server.NewRouter(h)
@@ -72,7 +49,7 @@ func main() {
 
 	go func() {
 		log.Printf("[Startup] Server running on :%s", port)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("[Startup] ListenAndServe error: %v", err)
 		}
 	}()

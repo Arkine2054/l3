@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"log"
+	"os"
 	"strconv"
+	"time"
 
 	"gitlab.com/arkine/l3/7/internal/models"
 	"gitlab.com/arkine/l3/7/internal/utils"
@@ -16,10 +18,46 @@ type Repo struct {
 	DB *sql.DB
 }
 
-func NewRepo(db *sql.DB) *Repo {
+func NewRepo() *Repo {
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		dbURL = "postgres://postgres:postgres@postgres:5432/warehouse?sslmode=disable"
+	}
+
+	var (
+		db  *sql.DB
+		err error
+	)
+
+	for i := 0; i < 10; i++ {
+		db, err = sql.Open("postgres", dbURL)
+		if err == nil {
+			if err = db.Ping(); err == nil {
+				break
+			}
+		}
+		log.Println("[Startup] DB ping failed, retrying in 2s...")
+		time.Sleep(2 * time.Second)
+	}
+
+	if err != nil {
+		log.Fatal("[Startup] Cannot connect to DB:", err)
+	}
+
 	db.SetMaxOpenConns(20)
 	db.SetMaxIdleConns(5)
-	return &Repo{DB: db}
+	db.SetConnMaxLifetime(60 * time.Minute)
+
+	log.Println("[Startup] Connected to PostgreSQL")
+
+	if err := utils.RunMigrations(db, "migrate"); err != nil {
+		log.Fatal("[Startup] Migration failed:", err)
+	}
+	log.Println("[Startup] Migrations applied successfully!")
+
+	return &Repo{
+		DB: db,
+	}
 }
 
 func (r *Repo) SetCurrentUser(ctx context.Context, userID int64) error {
@@ -189,7 +227,12 @@ func (r *Repo) GetHistoryForItem(ctx context.Context, id int64) ([]models.Histor
 		log.Printf("[GetHistoryForItem] Query err %v", err)
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			log.Printf("[GetHistoryForItem] rows.Close err %v", err)
+		}
+	}(rows)
 
 	var history []models.History
 	for rows.Next() {
