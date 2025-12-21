@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"log"
 	"net/http"
@@ -42,7 +43,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("DB connection failed: %v", err)
 	}
-	defer db.Close()
+	defer func(db *sql.DB) {
+		err := db.Close()
+		if err != nil {
+			log.Fatalf("DB close failed: %v", err)
+		}
+	}(db)
 
 	repo := repository.NewRepository(db)
 	svc := service.NewService(repo, time.Duration(expirationMinutes)*time.Minute)
@@ -53,9 +59,6 @@ func main() {
 
 	h := handlers.NewHandlers(svc)
 	h.RegisterRoutes(r)
-
-	fs := http.FileServer(http.Dir("./web"))
-	r.PathPrefix("/web/").Handler(http.StripPrefix("/web/", fs))
 
 	server := &http.Server{
 		Addr:    ":8080",

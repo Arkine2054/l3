@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -50,7 +51,12 @@ func (r *Repository) ListEvents(ctx context.Context) ([]models.EventInfo, error)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			log.Printf("failed to close rows: %v", err)
+		}
+	}(rows)
 
 	var events []models.EventInfo
 	for rows.Next() {
@@ -101,7 +107,12 @@ func (r *Repository) CreateBooking(ctx context.Context, eventID int, userName st
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func(tx *sql.Tx) {
+		err := tx.Rollback()
+		if err != nil {
+			log.Printf("failed to rollback transaction: %v", err)
+		}
+	}(tx)
 
 	var total, booked int
 	if err := tx.QueryRowContext(ctx, `SELECT total_seats FROM events WHERE id = $1;`, eventID).Scan(&total); err != nil {
