@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"gitlab.com/arkine/l3/6/internal/models"
@@ -98,7 +99,12 @@ func (r *Repo) ListSales(ctx context.Context, f ListFilter) ([]models.Sale, erro
 	if err != nil {
 		return nil, fmt.Errorf("list sales: %w", err)
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			log.Printf("Error closing rows: %v", err)
+		}
+	}(rows)
 
 	res := []models.Sale{}
 	for rows.Next() {
