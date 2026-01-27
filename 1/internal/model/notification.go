@@ -14,7 +14,6 @@ type Status string
 const (
 	StatusScheduled Status = "scheduled"
 	StatusSent      Status = "sent"
-	StatusFailed    Status = "failed"
 	StatusCancelled Status = "cancelled"
 )
 

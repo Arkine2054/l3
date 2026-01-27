@@ -1,4 +1,4 @@
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 WORKDIR /app
 
 COPY go.mod go.sum ./
@@ -12,6 +12,7 @@ WORKDIR /app
 COPY --from=builder /usr/local/bin/api /usr/local/bin/api
 
 COPY ui ./ui
+COPY .env .env
 
 EXPOSE 8083
 ENTRYPOINT ["/usr/local/bin/api"]

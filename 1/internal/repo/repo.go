@@ -8,40 +8,25 @@ import (
 	"log"
 	"time"
 
+	"github.com/wb-go/wbf/dbpg"
+
 	"gitlab.com/arkine/l3/1/internal/model"
 )
 
 type Repo struct {
-	DB *sql.DB
+	DB *dbpg.DB
 }
 
-func New(db *sql.DB) *Repo {
+func New(db *dbpg.DB) *Repo {
 	return &Repo{DB: db}
 }
 
-func Connect(postgresURL string) (*sql.DB, error) {
-	if postgresURL == "" {
-		return nil, fmt.Errorf("POSTGRES_URL is empty")
-	}
-
-	db, err := sql.Open("postgres", postgresURL)
-	if err != nil {
-		return nil, fmt.Errorf("sql.Open failed: %w", err)
-	}
-
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("db ping failed: %w", err)
-	}
-
-	log.Println("PostgreSQL connected successfully")
-	return db, nil
-}
-
+// CreateNotification создаёт новое уведомление и возвращает его ID
 func (r *Repo) CreateNotification(ctx context.Context, n *model.Notification) (int64, error) {
 	var id int64
 	err := r.DB.QueryRowContext(ctx,
 		`INSERT INTO notifications (recipient, channel, message, send_at, status, attempts, last_error, created_at)
-		 VALUES ($1,$2,$3,$4,$5,0,null,NOW()) RETURNING id`,
+		 VALUES ($1,$2,$3,$4,$5,0,NULL,NOW()) RETURNING id`,
 		n.Recipient, n.Channel, n.Message, n.SendAt, n.Status,
 	).Scan(&id)
 	if err != nil {
@@ -51,6 +36,7 @@ func (r *Repo) CreateNotification(ctx context.Context, n *model.Notification) (i
 	return id, nil
 }
 
+// GetNotification возвращает уведомление по ID
 func (r *Repo) GetNotification(ctx context.Context, id int64) (*model.Notification, error) {
 	var n model.Notification
 	var lastErr sql.NullString
@@ -74,6 +60,7 @@ func (r *Repo) GetNotification(ctx context.Context, id int64) (*model.Notificati
 	return &n, nil
 }
 
+// UpdateStatus обновляет статус уведомления
 func (r *Repo) UpdateStatus(ctx context.Context, id int64, status model.Status) error {
 	_, err := r.DB.ExecContext(ctx, `UPDATE notifications SET status=$1 WHERE id=$2`, status, id)
 	if err != nil {
@@ -83,6 +70,7 @@ func (r *Repo) UpdateStatus(ctx context.Context, id int64, status model.Status) 
 	return nil
 }
 
+// UpdateAttemptsAndError обновляет количество попыток и последнюю ошибку
 func (r *Repo) UpdateAttemptsAndError(ctx context.Context, id int64, attempts int, lastErr string) error {
 	_, err := r.DB.ExecContext(ctx, `UPDATE notifications SET attempts=$1, last_error=$2 WHERE id=$3`, attempts, lastErr, id)
 	if err != nil {
@@ -92,6 +80,7 @@ func (r *Repo) UpdateAttemptsAndError(ctx context.Context, id int64, attempts in
 	return nil
 }
 
+// ListRecent возвращает последние уведомления
 func (r *Repo) ListRecent(ctx context.Context, limit int) ([]model.Notification, error) {
 	rows, err := r.DB.QueryContext(ctx,
 		`SELECT id, recipient, channel, message, send_at, status, attempts, last_error, created_at
@@ -128,6 +117,7 @@ func (r *Repo) ListRecent(ctx context.Context, limit int) ([]model.Notification,
 	return out, nil
 }
 
+// UpdateNotification обновляет сообщение и дату отправки
 func (r *Repo) UpdateNotification(ctx context.Context, id int64, msg string, sendAt time.Time) error {
 	_, err := r.DB.ExecContext(ctx, `
         UPDATE notifications
@@ -137,8 +127,9 @@ func (r *Repo) UpdateNotification(ctx context.Context, id int64, msg string, sen
 	return err
 }
 
+// CancelNotification отменяет уведомление
 func (r *Repo) CancelNotification(ctx context.Context, id int64) error {
-	res, err := r.DB.ExecContext(ctx, `UPDATE notifications SET status='cancelled' WHERE id=$1`, id)
+	res, err := r.DB.ExecContext(ctx, `UPDATE notifications SET status=$1 WHERE id=$2`, model.StatusCancelled, id)
 	if err != nil {
 		log.Printf("CancelNotification failed for id=%d: %v", id, err)
 		return fmt.Errorf("cancel notification: %w", err)

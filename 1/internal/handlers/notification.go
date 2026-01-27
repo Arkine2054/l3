@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -10,14 +9,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/wb-go/wbf/rabbitmq"
 
 	"gitlab.com/arkine/l3/1/internal/model"
 	"gitlab.com/arkine/l3/1/internal/repo"
 )
 
 type NotificationHandler struct {
-	Repo *repo.Repo
-	AMQP *amqp.Channel
+	Repo   *repo.Repo
+	Client *rabbitmq.RabbitClient
 }
 
 type NotificationInput struct {
@@ -48,39 +48,58 @@ func (h *NotificationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Status:    model.StatusScheduled,
 	}
 
-	if err := n.Validate(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
 	id, err := h.Repo.CreateNotification(r.Context(), &n)
 	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
 
-	body := []byte(fmt.Sprintf(`{"id":%d}`, id))
-	if err := h.AMQP.Publish(
-		"",
+	ch, err := h.Client.GetChannel()
+	if err != nil {
+		http.Error(w, "rabbit error", http.StatusInternalServerError)
+		return
+	}
+	defer func(ch *amqp.Channel) {
+		err := ch.Close()
+		if err != nil {
+			http.Error(w, "rabbit error", http.StatusInternalServerError)
+		}
+	}(ch)
+
+	delay := time.Until(sendAt)
+	if delay < 0 {
+		delay = 0
+	}
+
+	body, err := json.Marshal(map[string]int64{"id": id})
+	if err != nil {
+		http.Error(w, "json error", http.StatusInternalServerError)
+	}
+
+	if err := ch.Publish(
+		"notifications.delayed",
 		"notifications",
 		false,
 		false,
 		amqp.Publishing{
 			ContentType: "application/json",
 			Body:        body,
+			Headers: amqp.Table{
+				"x-delay": int64(delay / time.Millisecond),
+			},
 		},
 	); err != nil {
-		log.Printf("rabbit publish error: %v", err)
-		http.Error(w, "failed to publish", http.StatusInternalServerError)
+		http.Error(w, "publish failed", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	err = json.NewEncoder(w).Encode(map[string]int64{"id": id})
+	_, err = w.Write([]byte(strconv.FormatInt(id, 10)))
 	if err != nil {
-		log.Printf("create json encode error: %v", err)
+		log.Printf("failed to write response: %s", err)
 	}
+
 }
 
 func (h *NotificationHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +122,7 @@ func (h *NotificationHandler) List(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(list)
 	if err != nil {
-		log.Printf("list json encode error: %v", err)
+		log.Printf("failed to encode response: %s", err)
 	}
 }
 
